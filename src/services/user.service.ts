@@ -13,7 +13,7 @@ export class UserService implements IUserService {
 
     async createUser(dto: CreateUserDto): Promise<User> {
         const id = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-        const user = new User(id, dto.name, dto.email);
+        const user = new User(id.toString(), dto.name, dto.email);
         return this.userRepository.save(user);
     }
 
