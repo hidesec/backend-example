@@ -1,7 +1,7 @@
 import "reflect-metadata";
-import { container } from "tsyringe";
+import { container, injectable } from "tsyringe";
 
-const BEAN_METADATA_KEY = "custom:bean";
+const BEAN_METADATA_KEY = "custom:bean-methods";
 
 interface BeanDefinition {
     token: string;
@@ -14,7 +14,14 @@ interface BeanDefinition {
  * @returns 
  */
 export function Bean(token?: string) {
-    return function (target: any, propertyKey: string, _descriptor: PropertyDescriptor) {
+    return function (target: any, propertyKey?: string, _descriptor?: PropertyDescriptor) {
+        if (propertyKey === undefined) {
+            injectable()(target);
+            const registrationToken = token ?? target.name;
+            container.register(registrationToken, { useClass: target });
+            return target
+        }
+        
         const existingBeans: BeanDefinition[] = Reflect.getMetadata(BEAN_METADATA_KEY, target.constructor) || [];
 
         existingBeans.push({

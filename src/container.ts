@@ -1,2 +1,5 @@
 import "reflect-metadata";
-import "./config/app-beans.config";
+import path from "path";
+import { componentScan } from "@config/component-scan";
+
+componentScan(path.join(__dirname))
