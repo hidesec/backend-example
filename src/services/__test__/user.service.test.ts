@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 import "reflect-metadata";
-import { IUserRepository } from "repositories/user.repository.interface";
-import { UserService } from "services/user.service";
+import { IUserRepository } from "@repositories/user.repository.interface";
+import { UserService } from "@services/user.service";
 
 describe("UserService", () => {
     let mockRepo: jest.Mocked<IUserRepository>;

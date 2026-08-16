@@ -1,8 +1,7 @@
-import { User } from "entities/user.entity";
-import { injectable } from "tsyringe";
+
+import { User } from "@entities/user.entity";
 import { IUserRepository } from "./user.repository.interface";
 
-@injectable()
 export class UserRepository implements IUserRepository {
     private db: Map<string, User> = new Map();
 

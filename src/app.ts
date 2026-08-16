@@ -2,15 +2,15 @@ import "reflect-metadata";
 import "./container";
 import express from "express";
 import userRoutes from "./routes/user.route";
-import { errorHandler } from "middlewares/error-handler.middleware";
-import { securityMiddlewares } from "middlewares/security.middleware";
+import { errorHandler } from "@middlewares/error-handler.middleware";
+import { securityMiddlewares } from "@middlewares/security.middleware";
 import pinoHttp from "pino-http";
-import { logger } from "config/logger";
+import { logger } from "@config/logger";
 import healthRoutes from "./routes/health.route";
-import { notFoundHandler } from "middlewares/not-found.middleware";
-import { env } from "config/env";
-import { printStartupBanner } from "config/startup-banner";
-import { mountRoutes, listRegisteredRoutes } from "config/route-lister";
+import { notFoundHandler } from "@middlewares/not-found.middleware";
+import { env } from "@config/env";
+import { printStartupBanner } from "@config/startup-banner";
+import { mountRoutes, listRegisteredRoutes } from "@config/route-lister";
 
 const app = express();
 

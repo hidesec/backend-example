@@ -8,5 +8,16 @@
         "esModuleInterop": true,
         "outDir": "dist",
         "baseUrl": "./src",
+        "paths": {
+            "@decorators/*": ["decorators/*"],
+            "@config/*": ["config/*"],
+            "@controllers/*": ["controllers/*"],
+            "@services/*": ["services/*"],
+            "@repositories/*": ["repositories/*"],
+            "@entities/*": ["entities/*"],
+            "@dto/*": ["dto/*"],
+            "@middlewares/*": ["middlewares/*"],
+            "@exceptions/*": ["exceptions/*"]
+        }
     }
 }

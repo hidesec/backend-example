@@ -1,6 +1,6 @@
+import { BadRequestException } from "@exceptions/http-exceptions";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
-import { BadRequestException } from "exceptions/http-exceptions";
 import { NextFunction, Request, Response } from "express";
 
 export function validateDto<T extends object>(dtoClass: new () => T) {

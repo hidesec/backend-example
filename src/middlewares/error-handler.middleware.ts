@@ -1,5 +1,6 @@
-import { logger } from "config/logger";
-import { HttpException } from "exceptions/http-exceptions";
+
+import { logger } from "@config/logger";
+import { HttpException } from "@exceptions/http-exceptions";
 import { Request, Response, NextFunction } from "express";
 
 export function errorHandler(

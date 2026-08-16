@@ -1,7 +1,7 @@
-import { IUserService } from "services/user.service.interface";
 import { inject, injectable } from "tsyringe";
 import { Request, Response, NextFunction } from "express";
-import { UserResponseDto } from "dto/user-response.dto";
+import { UserResponseDto } from "@dto/user-response.dto";
+import { IUserService } from "@services/user.service.interface";
 
 @injectable()
 export class UserController {
