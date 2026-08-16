@@ -11,6 +11,8 @@ import { notFoundHandler } from "@middlewares/not-found.middleware";
 import { env } from "@config/env";
 import { printStartupBanner } from "@config/startup-banner";
 import { mountRoutes, listRegisteredRoutes } from "@config/route-lister";
+import { container } from "tsyringe";
+import { Pool } from "pg";
 
 const app = express();
 
@@ -36,7 +38,10 @@ const server = app.listen(env.PORT, () => {
 
 function shutdown(signal: string) {
   logger.info(`${signal} received. shutting down gracefully...`);
-  server.close(() => {
+  server.close(async () => {
+    const pool = container.resolve<Pool>("DatabasePool");
+    await pool.end();
+    logger.info("PostgreSQL pool closed.")
     logger.info("Server closed. Exiting process.");
     process.exit(0);
   });

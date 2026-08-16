@@ -2,7 +2,7 @@ import { IUserRepository } from "@repositories/user.repository.interface";
 import { IUserService } from "./user.service.interface";
 import { CreateUserDto } from "@dto/create-user.dto";
 import { User } from "@entities/user.entity";
-import { NotFoundException } from "@exceptions/http-exceptions";
+import { BadRequestException, NotFoundException } from "@exceptions/http-exceptions";
 import { Bean } from "@decorators/bean.decorator";
 import { inject } from "tsyringe";
 
@@ -15,6 +15,11 @@ export class UserService implements IUserService {
 
     async createUser(dto: CreateUserDto): Promise<User> {
         const id = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+        const existing = await this.userRepository.findByEmail(dto.email);
+        if(existing) {
+            throw new BadRequestException(`Email ${dto.email} is already registered`);
+        }
+        
         const user = new User(id.toString(), dto.name, dto.email);
         return this.userRepository.save(user);
     }
