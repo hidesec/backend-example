@@ -25,7 +25,7 @@ function wrapHandler(
         throw new Error(`Handler "${handlerName}" not found on controller "${controllerTarget.name}"`);
     }
 
-    const successStatus = getResponseStatus(controllerTarget, handlerName);
+    const successStatus = getResponseStatus(controllerTarget, handlerName, 200);
 
     return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {

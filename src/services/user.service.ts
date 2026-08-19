@@ -5,6 +5,7 @@ import { User } from "@entities/user.entity";
 import { BadRequestException, NotFoundException } from "@exceptions/http-exceptions";
 import { Bean } from "@decorators/bean.decorator";
 import { inject } from "tsyringe";
+import { randomUUID } from "crypto";
 
 @Bean("IUserService")
 export class UserService implements IUserService {
@@ -14,13 +15,13 @@ export class UserService implements IUserService {
     ) {}
 
     async createUser(dto: CreateUserDto): Promise<User> {
-        const id = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+        const id = randomUUID();
         const existing = await this.userRepository.findByEmail(dto.email);
         if(existing) {
             throw new BadRequestException(`Email ${dto.email} is already registered`);
         }
         
-        const user = new User(id.toString(), dto.name, dto.email);
+        const user = new User(id, dto.name, dto.email);
         return this.userRepository.save(user);
     }
 
