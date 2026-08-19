@@ -1,8 +1,9 @@
 import { inject } from "tsyringe";
-import { Request, Response, NextFunction } from "express";
+import { Request } from "express";
 import { UserResponseDto } from "@dto/user-response.dto";
 import { IUserService } from "@services/user.service.interface";
-import { Get, Post, RestController } from "@decorators/route.decorator";
+import { RestController, Get, Post } from "@decorators/route.decorator";
+import { ResponseStatus } from "@decorators/response.decorator";
 
 @RestController("/users")
 export class UserController {
@@ -11,33 +12,22 @@ export class UserController {
     ) {}
 
     @Post("/")
-    createUser = async (req: Request, res: Response, next: NextFunction) => {
-        try {
-            req.log.info({ body: { email: req.body.email } }, "Creating new user");
-            const user = await this.userService.createUser(req.body as any);
-            req.log.info({ userId: user.id }, "User created successfully");
-            res.status(201).json(user);
-        } catch (err) {
-            next(err);
-        }
+    @ResponseStatus(201)
+    createUser = async (req: Request) => {
+        req.log.info({ body: { email: req.body.email } }, "Creating new user");
+        const user = await this.userService.createUser(req.body as any);
+        req.log.info({ userId: user.id }, "User created successfully");
+        return user;
     }
 
     @Get("/:id")
-    getUserById = async (req: Request, res: Response, next: NextFunction) => {
-        try {
-            req.log.info({ param: req.params.id }, "Get user by id");
-            const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-            const user = await this.userService.getUserById(id);
-            if (!user) {
-                res.status(404).json({ message: "User not found" });
-                req.log.info({ param: req.params.id }, "User not found");
-                return;
-            }
+    getUserById = async (req: Request) => {
+        const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        req.log.info({ param: id }, "Get user by id");
 
-            req.log.info({ param: req.params.id }, "Get user successfully");
-            res.status(200).json(UserResponseDto.fromEntity(user));
-        } catch (err) {
-            next(err);
-        }
+        const user = await this.userService.getUserById(id);
+
+        req.log.info({ param: id }, "Get user successfully");
+        return UserResponseDto.fromEntity(user);
     }
 }

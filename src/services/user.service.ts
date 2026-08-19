@@ -24,8 +24,8 @@ export class UserService implements IUserService {
         return this.userRepository.save(user);
     }
 
-    async getUserById(id: string): Promise<User | null> {
-        const user = this.userRepository.findById(id);
+    async getUserById(id: string): Promise<User> {
+        const user = await this.userRepository.findById(id);
         if (!user) {
             throw new NotFoundException(`User with id ${id} not found`);
         }
