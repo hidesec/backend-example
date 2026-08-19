@@ -4,12 +4,12 @@ import { UserResponseDto } from "@dto/user-response.dto";
 import { IUserService } from "@services/user.service.interface";
 import { RestController, Get, Post } from "@decorators/route.decorator";
 import { ResponseStatus } from "@decorators/response.decorator";
+import { AutoWired } from "@decorators/autowired.decorator";
 
 @RestController("/users")
 export class UserController {
-    constructor(
-        @inject("IUserService") private readonly userService: IUserService
-    ) {}
+    @AutoWired("IUserService")
+    declare private userService: IUserService;
 
     @Post("/")
     @ResponseStatus(201)

@@ -2,10 +2,12 @@ import { Pool } from "pg";
 import { inject } from "tsyringe";
 import { RestController, Get } from "@decorators/route.decorator";
 import { ServiceUnavailableException } from "@exceptions/http-exceptions";
+import { AutoWired } from "@decorators/autowired.decorator";
 
 @RestController()
 export class HealthController {
-    constructor(@inject("DatabasePool") private readonly pool: Pool) {}
+    @AutoWired("DatabasePool")
+    declare private pool: Pool;
 
     @Get("/health")
     check = async () => {
