@@ -1,5 +1,4 @@
 import { Pool } from "pg";
-import { inject } from "tsyringe";
 import { RestController, Get } from "@decorators/route.decorator";
 import { ServiceUnavailableException } from "@exceptions/http-exceptions";
 import { AutoWired } from "@decorators/autowired.decorator";
