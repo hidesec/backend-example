@@ -1,14 +1,16 @@
-import { inject, injectable } from "tsyringe";
+import { inject } from "tsyringe";
 import { Request, Response, NextFunction } from "express";
 import { UserResponseDto } from "@dto/user-response.dto";
 import { IUserService } from "@services/user.service.interface";
+import { Get, Post, RestController } from "@decorators/route.decorator";
 
-@injectable()
+@RestController("/users")
 export class UserController {
     constructor(
         @inject("IUserService") private readonly userService: IUserService
     ) {}
 
+    @Post("/")
     createUser = async (req: Request, res: Response, next: NextFunction) => {
         try {
             req.log.info({ body: { email: req.body.email } }, "Creating new user");
@@ -20,6 +22,7 @@ export class UserController {
         }
     }
 
+    @Get("/:id")
     getUserById = async (req: Request, res: Response, next: NextFunction) => {
         try {
             req.log.info({ param: req.params.id }, "Get user by id");

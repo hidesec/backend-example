@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-const SCAN_DIRS = ["repositories", "services", "config/beans"];
+const SCAN_DIRS = ["repositories", "services", "config/beans", "controllers"];
 
 export function componentScan(baseDir: string): void {
     SCAN_DIRS.forEach((dir) => {
