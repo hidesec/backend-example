@@ -3,6 +3,7 @@ import { inject } from "tsyringe";
 import { Bean } from "@decorators/bean.decorator";
 import { IUserRepository } from "./user.repository.interface";
 import { User } from "../entities/user.entity";
+import { getQueryRunner } from "@database/transaction-context";
 
 interface UserRow {
     id: string;
@@ -17,10 +18,8 @@ function mapRowToUser(row: UserRow): User {
 
 @Bean("IUserRepository")
 export class UserRepository implements IUserRepository {
-    constructor(@inject("DatabasePool") private readonly pool: Pool) {}
-
     async findById(id: string): Promise<User | null> {
-        const result = await this.pool.query<UserRow>(
+        const result = await getQueryRunner().query<UserRow>(
         "SELECT id, name, email, created_at FROM users WHERE id = $1",
         [id]
         );
@@ -28,7 +27,7 @@ export class UserRepository implements IUserRepository {
     }
 
     async findByEmail(email: string): Promise<User | null> {
-        const result = await this.pool.query<UserRow>(
+        const result = await getQueryRunner().query<UserRow>(
         "SELECT id, name, email, created_at FROM users WHERE email = $1",
         [email]
         );
@@ -36,14 +35,14 @@ export class UserRepository implements IUserRepository {
     }
 
     async findAll(): Promise<User[]> {
-        const result = await this.pool.query<UserRow>(
+        const result = await getQueryRunner().query<UserRow>(
         "SELECT id, name, email, created_at FROM users ORDER BY created_at DESC"
         );
         return result.rows.map(mapRowToUser);
     }
 
     async save(user: User): Promise<User> {
-        const result = await this.pool.query<UserRow>(
+        const result = await getQueryRunner().query<UserRow>(
         `INSERT INTO users (id, name, email, created_at)
         VALUES ($1, $2, $3, $4)
         ON CONFLICT (id) DO UPDATE
@@ -55,6 +54,6 @@ export class UserRepository implements IUserRepository {
     }
 
     async deleteById(id: string): Promise<void> {
-        await this.pool.query("DELETE FROM users WHERE id = $1", [id]);
+        await getQueryRunner().query("DELETE FROM users WHERE id = $1", [id]);
     }
 }

@@ -6,6 +6,7 @@ import { BadRequestException, NotFoundException } from "@exceptions/http-excepti
 import { Bean } from "@decorators/bean.decorator";
 import { inject } from "tsyringe";
 import { randomUUID } from "crypto";
+import { Transactional } from "@decorators/transactional.decorator";
 
 @Bean("IUserService")
 export class UserService implements IUserService {
@@ -14,6 +15,7 @@ export class UserService implements IUserService {
         private readonly userRepository: IUserRepository
     ) {}
 
+    @Transactional()
     async createUser(dto: CreateUserDto): Promise<User> {
         const id = randomUUID();
         const existing = await this.userRepository.findByEmail(dto.email);
