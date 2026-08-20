@@ -3,6 +3,7 @@ import {
     getEntityMetadata, hydrateEntity,
 } from "@decorators/orm/column.decorator";
 import { RelationLoader } from "@decorators/orm/relation-loader";
+import { QueryBuilder } from "@decorators/orm/query-builder";
 import { getQueryRunner } from "@database/transaction-context";
 import { IBaseRepository } from "@database/base-repository.interface";
 
@@ -37,6 +38,20 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
 
     protected mapRow(row: Record<string, any>): T {
         return hydrateEntity(this.entityCtor, row);
+    }
+
+    protected query(): QueryBuilder<T> {
+        return new QueryBuilder(this.entityCtor);
+    }
+
+    protected async raw<R = any>(sql: string, params: any[] = []): Promise<R[]> {
+        const result = await getQueryRunner().query(sql, params);
+        return result.rows;
+    }
+
+    protected async rawOne<R = any>(sql: string, params: any[] = []): Promise<R | null> {
+        const rows = await this.raw<R>(sql, params);
+        return rows[0] ?? null;
     }
 
     private async hydrateRows(rows: Record<string, any>[]): Promise<T[]> {
