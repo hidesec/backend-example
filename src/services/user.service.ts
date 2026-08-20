@@ -7,6 +7,8 @@ import { Bean } from "@decorators/bean.decorator";
 import { inject } from "tsyringe";
 import { randomUUID } from "crypto";
 import { Transactional } from "@decorators/transactional.decorator";
+import { Auditable } from "@decorators/auditable.decorator";
+import { LogExecution } from "@decorators/log-execution.decorator";
 
 @Bean("IUserService")
 export class UserService implements IUserService {
@@ -16,6 +18,8 @@ export class UserService implements IUserService {
     ) {}
 
     @Transactional()
+    @Auditable("USER_CREATED")
+    @LogExecution()
     async createUser(dto: CreateUserDto): Promise<User> {
         const id = randomUUID();
         const existing = await this.userRepository.findByEmail(dto.email);
@@ -27,6 +31,7 @@ export class UserService implements IUserService {
         return this.userRepository.save(user);
     }
 
+    @LogExecution()
     async getUserById(id: string): Promise<User> {
         const user = await this.userRepository.findById(id);
         if (!user) {
