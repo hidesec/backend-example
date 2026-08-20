@@ -1,11 +1,17 @@
 import "reflect-metadata";
 import { container, injectable } from "tsyringe";
+import { registerDestroyHook, registerLifecycleHooks } from "@decorators/lifecycle.decorator";
 
 const BEAN_METADATA_KEY = "custom:bean-methods";
+
+interface BeanMethodOptions {
+    destroyMethod?: string;
+}
 
 interface BeanDefinition {
     token: string;
     methodName: string;
+    destroyMethod?: string;
 }
 
 /**
@@ -13,12 +19,13 @@ interface BeanDefinition {
  * @param token 
  * @returns 
  */
-export function Bean(token?: string) {
+export function Bean(token?: string, options?: BeanMethodOptions) {
     return function (target: any, propertyKey?: string, _descriptor?: PropertyDescriptor) {
         if (propertyKey === undefined) {
             injectable()(target);
             const registrationToken = token ?? target.name;
             container.register(registrationToken, { useClass: target });
+            registerLifecycleHooks(registrationToken, target);
             return target
         }
         
@@ -27,6 +34,7 @@ export function Bean(token?: string) {
         existingBeans.push({
             token: token ?? propertyKey,
             methodName: propertyKey,
+            destroyMethod: options?.destroyMethod,
         });
 
         Reflect.defineMetadata(BEAN_METADATA_KEY, existingBeans, target.constructor);
@@ -43,9 +51,13 @@ export function Configuration() {
             console.warn(`[@Configuration] "${target.name}" has no @Bean methods defined.`);
         }
 
-        beans.forEach(({ token, methodName }) => {
+        beans.forEach(({ token, methodName,destroyMethod }) => {
             const beanInstance = (instance as any)[methodName]();
             container.register(token, { useValue: beanInstance });
+
+            if (destroyMethod) {
+                registerDestroyHook(token, () => beanInstance[destroyMethod]());
+            }
         });
 
         return target;

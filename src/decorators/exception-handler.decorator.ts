@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { injectable } from "tsyringe";
+import { registerLifecycleHooks } from "@decorators/lifecycle.decorator";
 
 type ExceptionClass = new (...args: any[]) => Error;
 
@@ -25,6 +26,7 @@ export function ExceptionHandler(exceptionType: ExceptionClass) {
 export function ControllerAdvice() {
     return function <T extends new (...args: any[]) => any>(target: T): T {
         injectable()(target);
+        registerLifecycleHooks(target, target);
         GLOBAL_ADVICE_REGISTRY.push(target);
         return target;
     };

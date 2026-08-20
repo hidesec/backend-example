@@ -5,7 +5,7 @@ import { logger } from "@config/logger";
 
 @Configuration()
 export class DatabaseConfig {
-    @Bean("DatabasePool")
+    @Bean("DatabasePool", { destroyMethod: "end" })
     pool(): Pool {
         const pool = new Pool({
             host: env.DB_HOST,

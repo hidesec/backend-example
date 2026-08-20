@@ -9,8 +9,7 @@ import { notFoundHandler } from "@middlewares/not-found.middleware";
 import { env } from "@config/env";
 import { printStartupBanner } from "@config/startup-banner";
 import { mountControllers, listRegisteredRoutes } from "@config/router-factory";
-import { container } from "tsyringe";
-import { Pool } from "pg";
+import { runPreDestroyHooks } from "@decorators/lifecycle.decorator";
 
 const app = express();
 
@@ -36,9 +35,7 @@ const server = app.listen(env.PORT, () => {
 function shutdown(signal: string) {
   logger.info(`${signal} received. shutting down gracefully...`);
   server.close(async () => {
-    const pool = container.resolve<Pool>("DatabasePool");
-    await pool.end();
-    logger.info("PostgreSQL pool closed.")
+    await runPreDestroyHooks();
     logger.info("Server closed. Exiting process.");
     process.exit(0);
   });

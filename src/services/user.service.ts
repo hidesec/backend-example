@@ -9,6 +9,8 @@ import { randomUUID } from "crypto";
 import { Transactional } from "@decorators/transactional.decorator";
 import { Auditable } from "@decorators/auditable.decorator";
 import { LogExecution } from "@decorators/log-execution.decorator";
+import { PostConstruct } from "@decorators/lifecycle.decorator";
+import { logger } from "@config/logger";
 
 @Bean("IUserService")
 export class UserService implements IUserService {
@@ -16,6 +18,11 @@ export class UserService implements IUserService {
         @inject("IUserRepository") 
         private readonly userRepository: IUserRepository
     ) {}
+
+    @PostConstruct()
+    init() {
+        logger.info("[@PostConstruct] UserService initialized")
+    }
 
     @Transactional()
     @Auditable("USER_CREATED")

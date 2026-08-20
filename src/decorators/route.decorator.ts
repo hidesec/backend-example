@@ -1,4 +1,5 @@
 import { injectable } from "tsyringe";
+import { registerLifecycleHooks } from "@decorators/lifecycle.decorator";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
@@ -19,6 +20,7 @@ const CONTROLLERS: ControllerRegistration[] = [];
 export function RestController(prefix: string = "/") {
     return function <T extends new (...args: any[]) => any>(target: T): T {
         injectable()(target);
+        registerLifecycleHooks(target, target);
         CONTROLLERS.push({ target, prefix });
         return target;
     };
