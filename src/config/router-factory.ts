@@ -2,6 +2,11 @@ import { Application, NextFunction, Request, Response, Router } from "express";
 import { container } from "tsyringe";
 import { getRegisteredControllers, getRoutesMetadata } from "@decorators/route.decorator";
 import { getResponseStatus } from "@decorators/response.decorator";
+import {
+    findMostSpecificHandler,
+    getExceptionHandlers,
+    getRegisteredAdvice,
+} from "@decorators/exception-handler.decorator";
 
 interface RouteInfo {
     method: string;
@@ -13,6 +18,30 @@ const registeredRoutes: RouteInfo[] = [];
 function joinPaths(prefix: string, path: string): string {
     const full = `${prefix}/${path}`.replace(/\/+/g, "/");
     return full.length > 1 && full.endsWith("/") ? full.slice(0, -1) : full;
+}
+
+async function tryHandleWithExceptionHandlers(
+    err: Error,
+    handlerTarget: Function,
+    handlerInstance: any,
+    req: Request,
+    res: Response
+): Promise<boolean> {
+    const handlers = getExceptionHandlers(handlerTarget);
+    if (handlers.length === 0) return false;
+
+    const match = findMostSpecificHandler(err, handlers);
+    if (!match) return false;
+
+    const method = handlerInstance[match.handlerName];
+    const result = await method.call(handlerInstance, err, req, res);
+    if (res.headersSent) return true;
+
+    const statusFromException = (err as any).statusCode;
+    const status = getResponseStatus(handlerTarget, match.handlerName, statusFromException ?? 500);
+    
+    res.status(status).json(result ?? { status: "error", message: err.message });
+    return true;
 }
 
 function wrapHandler(
@@ -42,7 +71,19 @@ function wrapHandler(
 
             res.status(successStatus).json(result);
         } catch (err) {
-            next(err);
+            const error = err instanceof Error ? err : new Error(String(err));
+            if (await tryHandleWithExceptionHandlers(error, controllerTarget, instance, req, res)) {
+                return;
+            }
+
+            for (const adviceTarget of getRegisteredAdvice()) {
+                const adviceInstance = container.resolve(adviceTarget);
+                if (await tryHandleWithExceptionHandlers(error, adviceTarget, adviceInstance, req, res)) {
+                    return;
+                }
+            }
+
+            next(error);
         }
     };
 }

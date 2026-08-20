@@ -1,10 +1,11 @@
-import { inject } from "tsyringe";
 import { Request } from "express";
 import { UserResponseDto } from "@dto/user-response.dto";
 import { IUserService } from "@services/user.service.interface";
 import { RestController, Get, Post } from "@decorators/route.decorator";
 import { ResponseStatus } from "@decorators/response.decorator";
 import { AutoWired } from "@decorators/autowired.decorator";
+import { ExceptionHandler } from "@decorators/exception-handler.decorator";
+import { BadRequestException } from "@exceptions/http-exceptions";
 
 @RestController("/users")
 export class UserController {
@@ -29,5 +30,11 @@ export class UserController {
 
         req.log.info({ param: id }, "Get user successfully");
         return UserResponseDto.fromEntity(user);
+    }
+
+    @ExceptionHandler(BadRequestException)
+    handleDuplicateEmail(err: BadRequestException, req: Request) {
+        req.log.warn({ path: req.path }, err.message);
+        return { status: "error", code: "USER_EMAIL_CONFLICT", message: err.message };
     }
 }

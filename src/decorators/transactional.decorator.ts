@@ -33,6 +33,7 @@ export function Transactional() {
             } catch (err) {
                 await client.query("ROLLBACK");
                 logger.warn({ method: propertyKey }, "Transactional rolled back");
+                throw err;
             } finally {
                 client.release();
             }
