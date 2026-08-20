@@ -1,7 +1,11 @@
 import { Application, NextFunction, Request, Response, Router } from "express";
 import { container } from "tsyringe";
+import { plainToInstance } from "class-transformer";
+import { validate } from "class-validator";
 import { getRegisteredControllers, getRoutesMetadata } from "@decorators/route.decorator";
 import { getResponseStatus } from "@decorators/response.decorator";
+import { getParamsMetadata, getParamType, ParamMetadata, ParamSource } from "@decorators/param.decorator";
+import { BadRequestException } from "@exceptions/http-exceptions";
 import {
     findMostSpecificHandler,
     getExceptionHandlers,
@@ -39,9 +43,73 @@ async function tryHandleWithExceptionHandlers(
 
     const statusFromException = (err as any).statusCode;
     const status = getResponseStatus(handlerTarget, match.handlerName, statusFromException ?? 500);
-    
+
     res.status(status).json(result ?? { status: "error", message: err.message });
     return true;
+}
+
+async function resolveValue(meta: ParamMetadata, req: Request, res: Response, next: NextFunction): Promise<unknown> {
+    switch (meta.source) {
+        case ParamSource.BODY:
+            return req.body;
+        case ParamSource.PARAM:
+            return meta.name ? req.params[meta.name] : req.params;
+        case ParamSource.QUERY:
+            return meta.name ? req.query[meta.name] : req.query;
+        case ParamSource.REQ:
+            return req;
+        case ParamSource.RES:
+            return res;
+        case ParamSource.NEXT:
+            return next;
+    }
+}
+
+async function resolveHandlerArgs(
+    controllerTarget: Function,
+    handlerName: string,
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<unknown[]> {
+    const paramsMeta = getParamsMetadata(controllerTarget, handlerName);
+
+    if (paramsMeta.length === 0) {
+        return [req, res, next];
+    }
+
+    const args: unknown[] = [];
+
+    for (const meta of paramsMeta.sort((a, b) => a.index - b.index)) {
+        let value = await resolveValue(meta, req, res, next);
+
+        if (meta.validate) {
+            const dtoClass = getParamType(controllerTarget, handlerName, meta.index);
+            if (!dtoClass) {
+                throw new Error(
+                    `@Valid() on "${controllerTarget.name}.${handlerName}" (param ${meta.index}) could not resolve a DTO type. ` +
+                    `Make sure the parameter has an explicit class type, e.g. "dto: CreateUserDto".`
+                );
+            }
+
+            const instance = plainToInstance(dtoClass, value);
+            const errors = await validate(instance as object);
+
+            if (errors.length > 0) {
+                const message = errors
+                    .map((e) => Object.values(e.constraints ?? {}))
+                    .flat()
+                    .join(", ");
+                throw new BadRequestException(message);
+            }
+
+            value = instance;
+        }
+
+        args[meta.index] = value;
+    }
+
+    return args;
 }
 
 function wrapHandler(
@@ -58,7 +126,8 @@ function wrapHandler(
 
     return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const result = await handler.call(instance, req, res, next);
+            const args = await resolveHandlerArgs(controllerTarget, handlerName, req, res, next);
+            const result = await handler.apply(instance, args);
 
             if (res.headersSent) {
                 return;
@@ -87,6 +156,7 @@ function wrapHandler(
         }
     };
 }
+
 export function mountControllers(app: Application): void {
     getRegisteredControllers().forEach(({ target, prefix }) => {
         const routes = getRoutesMetadata(target);

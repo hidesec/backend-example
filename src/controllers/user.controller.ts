@@ -1,10 +1,12 @@
 import { Request } from "express";
 import { UserResponseDto } from "@dto/user-response.dto";
+import { CreateUserDto } from "@dto/create-user.dto";
 import { IUserService } from "@services/user.service.interface";
 import { RestController, Get, Post } from "@decorators/route.decorator";
 import { ResponseStatus } from "@decorators/response.decorator";
 import { AutoWired } from "@decorators/autowired.decorator";
 import { ExceptionHandler } from "@decorators/exception-handler.decorator";
+import { Body, Param, Req, Valid } from "@decorators/param.decorator";
 import { BadRequestException } from "@exceptions/http-exceptions";
 
 @RestController("/users")
@@ -14,16 +16,15 @@ export class UserController {
 
     @Post("/")
     @ResponseStatus(201)
-    createUser = async (req: Request) => {
-        req.log.info({ body: { email: req.body.email } }, "Creating new user");
-        const user = await this.userService.createUser(req.body as any);
+    async createUser(@Valid() @Body() dto: CreateUserDto, @Req() req: Request) {
+        req.log.info({ body: { email: dto.email } }, "Creating new user");
+        const user = await this.userService.createUser(dto);
         req.log.info({ userId: user.id }, "User created successfully");
         return user;
     }
 
     @Get("/:id")
-    getUserById = async (req: Request) => {
-        const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    async getUserById(@Param("id") id: string, @Req() req: Request) {
         req.log.info({ param: id }, "Get user by id");
 
         const user = await this.userService.getUserById(id);
