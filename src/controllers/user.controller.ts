@@ -24,6 +24,7 @@ export class UserController {
     }
 
     @Get("/:id")
+    @ResponseStatus(200)
     async getUserById(@Param("id") id: string, @Req() req: Request) {
         req.log.info({ param: id }, "Get user by id");
 

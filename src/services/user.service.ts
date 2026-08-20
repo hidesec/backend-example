@@ -38,6 +38,7 @@ export class UserService implements IUserService {
         return this.userRepository.save(user);
     }
 
+    @Auditable("GET_USER")
     @LogExecution()
     async getUserById(id: string): Promise<User> {
         const user = await this.userRepository.findById(id);

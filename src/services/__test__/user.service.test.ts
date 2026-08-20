@@ -10,8 +10,14 @@ describe("UserService", () => {
     beforeEach(() => {
         mockRepo = {
             findById: jest.fn(),
+            findByEmail: jest.fn(),
             findAll: jest.fn(),
+            findAllById: jest.fn(),
+            existsById: jest.fn(),
+            count: jest.fn(),
             save: jest.fn(),
+            deleteById: jest.fn(),
+            delete: jest.fn(),
         };
         userService = new UserService(mockRepo);
     });

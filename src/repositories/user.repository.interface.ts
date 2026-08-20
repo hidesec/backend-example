@@ -1,9 +1,6 @@
 import { User } from "@entities/user.entity";
+import { IBaseRepository } from "@database/base-repository.interface";
 
-export interface IUserRepository {
-    findById(id: string): Promise<User | null>;
+export interface IUserRepository extends IBaseRepository<User, string> {
     findByEmail(email: string): Promise<User | null>;
-    findAll(): Promise<User[]>;
-    save(user: User): Promise<User>;
-    deleteById(id: string): Promise<void>;
 }
