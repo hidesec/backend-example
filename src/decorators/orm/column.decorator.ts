@@ -15,6 +15,15 @@ export enum ColumnType {
   ENUM = "ENUM",
 }
 
+export type FetchType = "EAGER" | "LAZY";
+
+export interface RelationInfo {
+  propertyName: string;
+  type: "ManyToOne" | "OneToMany" | "OneToOne" | "ManyToMany";
+  targetEntity: () => Function;
+  fetch: FetchType;
+}
+
 export interface ColumnOptions {
   type: ColumnType;
   length?: number;
@@ -200,74 +209,54 @@ function tableNameOf(entityFn: () => Function): string {
 
 export function ManyToOne(
   targetEntity: () => Function,
-  options?: { onDelete?: CascadeAction; nullable?: boolean; joinColumn?: string }
+  options?: { onDelete?: CascadeAction; nullable?: boolean; joinColumn?: string; fetch?: FetchType }
 ) {
   return function (target: any, propertyName: string) {
     const entity = getOrCreateEntity(target.constructor);
     const columnName = options?.joinColumn ?? `${toSnakeCase(propertyName)}_id`;
-
     entity.foreignKeys.push({
-      propertyName,
-      columnName,
-      referencedTable: "", // di-resolve lazy saat build SQL (lihat schema-builder)
-      referencedColumn: "id",
-      onDelete: options?.onDelete ?? "RESTRICT",
-      nullable: options?.nullable ?? false,
+      propertyName, columnName, referencedTable: "", referencedColumn: "id",
+      onDelete: options?.onDelete ?? "RESTRICT", nullable: options?.nullable ?? false,
     });
-
-    entity.relations.push({ propertyName, type: "ManyToOne", targetEntity });
-
-    // Simpan resolver table name terpisah karena butuh lazy evaluation (class lain mungkin belum ter-load)
+    entity.relations.push({ propertyName, type: "ManyToOne", targetEntity, fetch: options?.fetch ?? "EAGER" });
     (entity.foreignKeys[entity.foreignKeys.length - 1] as any)._resolveTable = () => tableNameOf(targetEntity);
   };
 }
 
-export function OneToMany(targetEntity: () => Function, _inverseSide?: string) {
+export function OneToMany(targetEntity: () => Function, _inverseSide?: string, options?: { fetch?: FetchType }) {
   return function (target: any, propertyName: string) {
     const entity = getOrCreateEntity(target.constructor);
-    entity.relations.push({ propertyName, type: "OneToMany", targetEntity });
+    entity.relations.push({ propertyName, type: "OneToMany", targetEntity, fetch: options?.fetch ?? "LAZY" });
   };
 }
 
 export function OneToOne(
   targetEntity: () => Function,
-  options?: { onDelete?: CascadeAction; nullable?: boolean; joinColumn?: string }
+  options?: { onDelete?: CascadeAction; nullable?: boolean; joinColumn?: string; fetch?: FetchType }
 ) {
   return function (target: any, propertyName: string) {
     const entity = getOrCreateEntity(target.constructor);
     const columnName = options?.joinColumn ?? `${toSnakeCase(propertyName)}_id`;
-
     entity.foreignKeys.push({
-      propertyName,
-      columnName,
-      referencedTable: "",
-      referencedColumn: "id",
-      onDelete: options?.onDelete ?? "CASCADE",
-      nullable: options?.nullable ?? true,
-      unique: true,
+      propertyName, columnName, referencedTable: "", referencedColumn: "id",
+      onDelete: options?.onDelete ?? "CASCADE", nullable: options?.nullable ?? true, unique: true,
     });
-
-    entity.relations.push({ propertyName, type: "OneToOne", targetEntity });
+    entity.relations.push({ propertyName, type: "OneToOne", targetEntity, fetch: options?.fetch ?? "EAGER" });
     (entity.foreignKeys[entity.foreignKeys.length - 1] as any)._resolveTable = () => tableNameOf(targetEntity);
   };
 }
 
 export function ManyToMany(
   targetEntity: () => Function,
-  options?: { joinTable?: string; joinColumn?: string; inverseJoinColumn?: string }
+  options?: { joinTable?: string; joinColumn?: string; inverseJoinColumn?: string; fetch?: FetchType }
 ) {
   return function (target: any, propertyName: string) {
     const entity = getOrCreateEntity(target.constructor);
-
     entity.manyToMany.push({
-      propertyName,
-      targetEntity,
-      joinTable: options?.joinTable,
-      joinColumn: options?.joinColumn,
-      inverseJoinColumn: options?.inverseJoinColumn,
+      propertyName, targetEntity,
+      joinTable: options?.joinTable, joinColumn: options?.joinColumn, inverseJoinColumn: options?.inverseJoinColumn,
     });
-
-    entity.relations.push({ propertyName, type: "ManyToMany", targetEntity });
+    entity.relations.push({ propertyName, type: "ManyToMany", targetEntity, fetch: options?.fetch ?? "LAZY" });
   };
 }
 
@@ -289,4 +278,15 @@ export function getEntityMetadata(target: Function): EntityMetadata | undefined 
 
 export function getAllEntities(): EntityMetadata[] {
   return Array.from(ENTITIES.values());
+}
+
+export function hydrateEntity<T extends object>(ctor: new (...args: any[]) => T, row: Record<string, any>): T {
+  const meta = getEntityMetadata(ctor);
+  if (!meta) {
+    throw new Error(`No @Entity metadata found for "${ctor.name}". Did you forget to add @Entity() to it?`);
+  }
+  const instance = Object.create(ctor.prototype) as T;
+  meta.columns.forEach((col) => { (instance as any)[col.propertyName] = row[col.columnName]; });
+  meta.foreignKeys.forEach((fk) => { (instance as any)[fk.propertyName] = row[fk.columnName]; });
+  return instance;
 }

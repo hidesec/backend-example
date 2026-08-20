@@ -1,17 +1,18 @@
-import { ColumnMetadata, EntityMetadata, ForeignKeyMetadata, getEntityMetadata } from "@decorators/orm/column.decorator";
+import {
+    ColumnMetadata, EntityMetadata, ForeignKeyMetadata, RelationInfo,
+    getEntityMetadata, hydrateEntity,
+} from "@decorators/orm/column.decorator";
+import { RelationLoader } from "@decorators/orm/relation-loader";
 import { getQueryRunner } from "@database/transaction-context";
 import { IBaseRepository } from "@database/base-repository.interface";
 
 export abstract class BaseRepository<T extends object, ID = string> implements IBaseRepository<T, ID> {
     protected abstract readonly entityCtor: new (...args: any[]) => T;
+    private _relationLoader?: RelationLoader<T>;
 
     protected get meta(): EntityMetadata {
         const meta = getEntityMetadata(this.entityCtor);
-        if (!meta) {
-            throw new Error(
-                `No @Entity metadata found for "${this.entityCtor.name}". Did you forget to add @Entity() to it?`
-            );
-        }
+        if (!meta) throw new Error(`No @Entity metadata found for "${this.entityCtor.name}". Did you forget to add @Entity() to it?`);
         return meta;
     }
 
@@ -21,12 +22,7 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
 
     protected get primaryColumn(): ColumnMetadata {
         const pk = this.meta.columns.find((c) => c.isPrimary);
-        if (!pk) {
-            throw new Error(
-                `Entity "${this.entityCtor.name}" has no primary column. ` +
-                `Add @PrimaryGeneratedColumn() or @PrimaryColumn() to one of its fields.`
-            );
-        }
+        if (!pk) throw new Error(`Entity "${this.entityCtor.name}" has no primary column. Add @PrimaryGeneratedColumn() or @PrimaryColumn().`);
         return pk;
     }
 
@@ -34,50 +30,82 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
         return [...this.meta.columns, ...this.meta.foreignKeys];
     }
 
+    private get relationLoader(): RelationLoader<T> {
+        if (!this._relationLoader) this._relationLoader = new RelationLoader(this.entityCtor);
+        return this._relationLoader;
+    }
+
     protected mapRow(row: Record<string, any>): T {
-        const instance = Object.create(this.entityCtor.prototype) as T;
+        return hydrateEntity(this.entityCtor, row);
+    }
 
-        this.meta.columns.forEach((col) => {
-            (instance as any)[col.propertyName] = row[col.columnName];
+    private async hydrateRows(rows: Record<string, any>[]): Promise<T[]> {
+        if (rows.length === 0) return [];
+        const eagerRelations = this.meta.relations.filter((r) => r.fetch === "EAGER");
+        if (eagerRelations.length > 0) {
+            await this.relationLoader.attach(rows, eagerRelations.map((r) => r.propertyName));
+        }
+        return rows.map((row) => this.hydrateSingle(row));
+    }
+
+    private hydrateSingle(row: Record<string, any>): T {
+        const entity = hydrateEntity(this.entityCtor, row);
+
+        this.meta.relations.forEach((relation) => {
+            if (relation.fetch === "EAGER") {
+                (entity as any)[relation.propertyName] = this.toEntityValue(relation, row[relation.propertyName]);
+                return;
+            }
+            let cached: Promise<unknown> | undefined;
+            Object.defineProperty(entity, relation.propertyName, {
+                enumerable: true,
+                configurable: true,
+                get: () => {
+                    if (!cached) cached = this.loadLazyRelation(row, relation);
+                    return cached;
+                },
+            });
         });
 
-        this.meta.foreignKeys.forEach((fk) => {
-            (instance as any)[fk.propertyName] = row[fk.columnName];
-        });
+        return entity;
+    }
 
-        return instance;
+    private async loadLazyRelation(row: Record<string, any>, relation: RelationInfo): Promise<unknown> {
+        const rowCopy = { ...row };
+        await this.relationLoader.attach([rowCopy], [relation.propertyName]);
+        return this.toEntityValue(relation, rowCopy[relation.propertyName]);
+    }
+
+    private toEntityValue(relation: RelationInfo, raw: unknown): unknown {
+        const targetCtor = relation.targetEntity() as new (...args: any[]) => object;
+        if (relation.type === "OneToMany" || relation.type === "ManyToMany") {
+            return Array.isArray(raw) ? raw.map((r) => hydrateEntity(targetCtor, r)) : [];
+        }
+        return raw ? hydrateEntity(targetCtor, raw as Record<string, any>) : null;
     }
 
     async findById(id: ID): Promise<T | null> {
         const pk = this.primaryColumn;
-        const result = await getQueryRunner().query(
-            `SELECT * FROM ${this.qualifiedTable} WHERE ${pk.columnName} = $1`,
-            [id]
-        );
-        return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+        const result = await getQueryRunner().query(`SELECT * FROM ${this.qualifiedTable} WHERE ${pk.columnName} = $1`, [id]);
+        const [entity] = await this.hydrateRows(result.rows);
+        return entity ?? null;
     }
 
     async findAll(): Promise<T[]> {
         const result = await getQueryRunner().query(`SELECT * FROM ${this.qualifiedTable}`);
-        return result.rows.map((row: Record<string, any>) => this.mapRow(row));
+        return this.hydrateRows(result.rows);
     }
 
     async findAllById(ids: ID[]): Promise<T[]> {
         if (ids.length === 0) return [];
         const pk = this.primaryColumn;
-        const result = await getQueryRunner().query(
-            `SELECT * FROM ${this.qualifiedTable} WHERE ${pk.columnName} = ANY($1)`,
-            [ids]
-        );
-        return result.rows.map((row: Record<string, any>) => this.mapRow(row));
+        const result = await getQueryRunner().query(`SELECT * FROM ${this.qualifiedTable} WHERE ${pk.columnName} = ANY($1)`, [ids]);
+        return this.hydrateRows(result.rows);
     }
 
     async existsById(id: ID): Promise<boolean> {
         const pk = this.primaryColumn;
-        const result = await getQueryRunner().query(
-            `SELECT 1 FROM ${this.qualifiedTable} WHERE ${pk.columnName} = $1 LIMIT 1`,
-            [id]
-        );
+        const result = await getQueryRunner().query(`SELECT 1 FROM ${this.qualifiedTable} WHERE ${pk.columnName} = $1 LIMIT 1`, [id]);
         return (result.rowCount ?? 0) > 0;
     }
 
@@ -89,11 +117,9 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
     async save(entity: T): Promise<T> {
         const pk = this.primaryColumn;
         const columns = this.persistableColumns;
-
         const insertColumnNames = columns.map((c) => c.columnName);
         const values = columns.map((c) => (entity as any)[c.propertyName]);
         const placeholders = values.map((_, i) => `$${i + 1}`);
-
         const updatableColumns = columns.filter((c) => {
             const isPk = "isPrimary" in c && c.isPrimary;
             const isCreatedAt = "isCreatedAt" in c && c.isCreatedAt;
@@ -102,13 +128,11 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
         const updateClause = updatableColumns.length > 0
             ? `DO UPDATE SET ${updatableColumns.map((c) => `${c.columnName} = EXCLUDED.${c.columnName}`).join(", ")}`
             : "DO NOTHING";
-
         const sql = `
             INSERT INTO ${this.qualifiedTable} (${insertColumnNames.join(", ")})
             VALUES (${placeholders.join(", ")})
             ON CONFLICT (${pk.columnName}) ${updateClause}
             RETURNING *`;
-
         const result = await getQueryRunner().query(sql, values);
         return this.mapRow(result.rows[0]);
     }
