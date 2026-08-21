@@ -3,7 +3,18 @@ import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { getRegisteredControllers, getRoutesMetadata } from "@decorators/route.decorator";
 import { getResponseStatus } from "@decorators/response.decorator";
-import { getParamsMetadata, getParamType, ParamMetadata, ParamSource } from "@decorators/param.decorator";
+import {
+    getClassGuards,
+    getHandlerGuards,
+    runGuards,
+} from "@decorators/guard.decorator";
+import {
+    getParamsMetadata,
+    getParamType,
+    ParamMetadata,
+    ParamSource,
+    ValidOptions,
+} from "@decorators/param.decorator";
 import { BadRequestException } from "@exceptions/http-exceptions";
 import {
     findMostSpecificHandler,
@@ -12,6 +23,7 @@ import {
 } from "@decorators/exception-handler.decorator";
 import { HttpAdapter } from "@http/http-adapter";
 import { SolumNext, SolumRequest, SolumResponse } from "@http/http-types";
+import { AuthenticatedRequest } from "@auth/guards/jwt-auth.guard";
 
 interface RouteInfo {
     method: string;
@@ -62,6 +74,10 @@ async function resolveValue(
             return meta.name ? req.params[meta.name] : req.params;
         case ParamSource.QUERY:
             return meta.name ? req.query[meta.name] : req.query;
+        case ParamSource.HEADER:
+            return meta.name ? req.headers[meta.name.toLowerCase()] : req.headers;
+        case ParamSource.CURRENT_USER:
+            return (req as AuthenticatedRequest).user;
         case ParamSource.REQ:
             return req;
         case ParamSource.RES:
@@ -98,8 +114,12 @@ async function resolveHandlerArgs(
                 );
             }
 
+            const options: ValidOptions = meta.validateOptions ?? {};
             const instance = plainToInstance(dtoClass, value);
-            const errors = await validate(instance as object);
+            const errors = await validate(instance as object, {
+                whitelist: options.whitelist ?? false,
+                forbidNonWhitelisted: options.forbidNonWhitelisted ?? false,
+            });
 
             if (errors.length > 0) {
                 const message = errors
@@ -132,6 +152,11 @@ function wrapHandler(
 
     return async (req: SolumRequest, res: SolumResponse, next: SolumNext): Promise<void> => {
         try {
+            const guards = [...getClassGuards(controllerTarget), ...getHandlerGuards(controllerTarget, handlerName)];
+            if (guards.length > 0) {
+                await runGuards(guards, { classRef: controllerTarget, handlerName, request: req, response: res });
+            }
+
             const args = await resolveHandlerArgs(controllerTarget, handlerName, req, res, next);
             const result = await handler.apply(instance, args);
 

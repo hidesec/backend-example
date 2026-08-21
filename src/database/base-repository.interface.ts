@@ -1,7 +1,10 @@
+import { Page, PageRequest } from "@http/pagination";
+
 export interface IBaseRepository<T, ID> {
     findById(id: ID): Promise<T | null>;
     findAll(): Promise<T[]>;
     findAllById(ids: ID[]): Promise<T[]>;
+    findPage(request: PageRequest): Promise<Page<T>>;
     existsById(id: ID): Promise<boolean>;
     count(): Promise<number>;
     save(entity: T): Promise<T>;

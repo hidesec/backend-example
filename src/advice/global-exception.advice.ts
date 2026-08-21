@@ -3,10 +3,12 @@ import { logger } from "@config/logger";
 import { ControllerAdvice, ExceptionHandler } from "@decorators/exception-handler.decorator";
 import {
     BadRequestException,
+    ForbiddenException,
     HttpException,
     InvalidQueryParameterException,
     NotFoundException,
     ServiceUnavailableException,
+    UnauthorizedException,
 } from "@exceptions/http-exceptions";
 
 @ControllerAdvice()
@@ -33,6 +35,18 @@ export class GlobalExceptionAdvice {
     handleServiceUnavailable(err: ServiceUnavailableException, req: SolumRequest) {
         logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
         return { status: "error", code: "SERVICE_UNAVAILABLE", message: err.message };
+    }
+
+    @ExceptionHandler(UnauthorizedException)
+    handleUnauthorized(err: UnauthorizedException, req: SolumRequest) {
+        logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
+        return { status: "error", code: "UNAUTHORIZED", message: err.message };
+    }
+
+    @ExceptionHandler(ForbiddenException)
+    handleForbidden(err: ForbiddenException, req: SolumRequest) {
+        logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
+        return { status: "error", code: "FORBIDDEN", message: err.message };
     }
 
     @ExceptionHandler(HttpException)

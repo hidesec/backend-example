@@ -11,6 +11,7 @@ import { env } from "@config/env";
 import { printStartupBanner } from "@config/startup-banner";
 import { mountControllers, listRegisteredRoutes } from "@config/router-factory";
 import { runPreDestroyHooks } from "@decorators/lifecycle.decorator";
+import { startScheduledTasks, stopScheduledTasks } from "@schedule/scheduler";
 
 const rawApp = express();
 
@@ -33,10 +34,13 @@ const server = httpAdapter.listen(env.PORT, () => {
   routes.forEach((r) => {
     logger.info(`  ${r.method.padEnd(6)} ${r.path}`);
   });
+
+  startScheduledTasks();
 }) as import("http").Server;
 
 function shutdown(signal: string) {
   logger.info(`${signal} received. shutting down gracefully...`);
+  stopScheduledTasks();
   server.close(async () => {
     await runPreDestroyHooks();
     logger.info("Server closed. Exiting process.");

@@ -6,6 +6,7 @@ import { RelationLoader } from "@decorators/orm/relation-loader";
 import { QueryBuilder } from "@decorators/orm/query-builder";
 import { getQueryRunner } from "@database/transaction-context";
 import { IBaseRepository } from "@database/base-repository.interface";
+import { Page, PageRequest } from "@http/pagination";
 
 export abstract class BaseRepository<T extends object, ID = string> implements IBaseRepository<T, ID> {
     protected abstract readonly entityCtor: new (...args: any[]) => T;
@@ -42,6 +43,10 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
 
     protected query(): QueryBuilder<T> {
         return new QueryBuilder(this.entityCtor);
+    }
+
+    async findPage(request: PageRequest): Promise<Page<T>> {
+        return this.query().paginate(request);
     }
 
     protected async raw<R = any>(sql: string, params: any[] = []): Promise<R[]> {
@@ -129,8 +134,21 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
         return Number(result.rows[0].count);
     }
 
+    private applyTimestamps(entity: T): void {
+        const now = new Date();
+        this.meta.columns.forEach((col) => {
+            if (col.isCreatedAt && (entity as any)[col.propertyName] === undefined) {
+                (entity as any)[col.propertyName] = now;
+            }
+            if (col.isUpdatedAt) {
+                (entity as any)[col.propertyName] = now;
+            }
+        });
+    }
+
     async save(entity: T): Promise<T> {
         const pk = this.primaryColumn;
+        this.applyTimestamps(entity);
         const columns = this.persistableColumns;
         const insertColumnNames = columns.map((c) => c.columnName);
         const values = columns.map((c) => (entity as any)[c.propertyName]);

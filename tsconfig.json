@@ -6,19 +6,23 @@
         "emitDecoratorMetadata": true,
         "strict": true,
         "esModuleInterop": true,
+        "skipLibCheck": true,
         "outDir": "dist",
         "baseUrl": "./src",
         "paths": {
+            "@auth/*": ["auth/*"],
             "@config/*": ["config/*"],
             "@controllers/*": ["controllers/*"],
             "@database/*": ["database/*"],
             "@decorators/*": ["decorators/*"],
             "@dto/*": ["dto/*"],
             "@entities/*": ["entities/*"],
+            "@events/*": ["events/*"],
             "@http/*": ["http/*"],
             "@exceptions/*": ["exceptions/*"],
             "@middlewares/*": ["middlewares/*"],
             "@repositories/*": ["repositories/*"],
+            "@schedule/*": ["schedule/*"],
             "@services/*": ["services/*"]
         }
     }

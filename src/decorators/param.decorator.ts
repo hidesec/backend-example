@@ -4,9 +4,16 @@ export enum ParamSource {
     BODY = "body",
     PARAM = "param",
     QUERY = "query",
+    HEADER = "header",
+    CURRENT_USER = "currentUser",
     REQ = "req",
     RES = "res",
     NEXT = "next",
+}
+
+export interface ValidOptions {
+    whitelist?: boolean;
+    forbidNonWhitelisted?: boolean;
 }
 
 export interface ParamMetadata {
@@ -14,6 +21,7 @@ export interface ParamMetadata {
     source: ParamSource;
     name?: string;
     validate?: boolean;
+    validateOptions?: ValidOptions;
 }
 
 const PARAMS_METADATA_KEY = "custom:route-params";
@@ -49,6 +57,18 @@ export function Query(name?: string): ParameterDecorator {
     };
 }
 
+export function Header(name?: string): ParameterDecorator {
+    return (target, propertyKey, index) => {
+        addOrPatchParam(target, propertyKey as string, index, { source: ParamSource.HEADER, name });
+    };
+}
+
+export function CurrentUser(): ParameterDecorator {
+    return (target, propertyKey, index) => {
+        addOrPatchParam(target, propertyKey as string, index, { source: ParamSource.CURRENT_USER });
+    };
+}
+
 export function Req(): ParameterDecorator {
     return (target, propertyKey, index) => {
         addOrPatchParam(target, propertyKey as string, index, { source: ParamSource.REQ });
@@ -67,9 +87,9 @@ export function Next(): ParameterDecorator {
     };
 }
 
-export function Valid(): ParameterDecorator {
+export function Valid(options?: ValidOptions): ParameterDecorator {
     return (target, propertyKey, index) => {
-        addOrPatchParam(target, propertyKey as string, index,{ validate: true });
+        addOrPatchParam(target, propertyKey as string, index, { validate: true, validateOptions: options });
     };
 }
 

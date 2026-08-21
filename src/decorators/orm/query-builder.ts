@@ -1,5 +1,6 @@
 import { EntityMetadata, getEntityMetadata, hydrateEntity } from "./column.decorator";
 import { getQueryRunner } from "@database/transaction-context";
+import { buildPage, Page, PageRequest } from "@http/pagination";
 
 export type WhereOperator = "=" | "!=" | "<>" | ">" | ">=" | "<" | "<=" | "LIKE" | "ILIKE";
 type JoinType = "INNER" | "LEFT" | "RIGHT" | "FULL";
@@ -239,12 +240,17 @@ export class QueryBuilder<T extends object> {
         return { sql: ` WHERE ${parts.join("")}`, params };
     }
 
-    toSQL(): { sql: string; params: any[] } {
-        let sql = `SELECT ${this.selectColumns.join(", ")} FROM ${this.table}`;
-
+    private buildJoinClause(): string {
+        let sql = "";
         this.joins.forEach((j) => {
             sql += ` ${j.type} JOIN ${j.table} ON ${j.leftColumn} ${j.operator} ${j.rightColumn}`;
         });
+        return sql;
+    }
+
+    toSQL(): { sql: string; params: any[] } {
+        let sql = `SELECT ${this.selectColumns.join(", ")} FROM ${this.table}`;
+        sql += this.buildJoinClause();
 
         const { sql: whereSql, params } = this.buildWhereClause(1);
         sql += whereSql;
@@ -274,6 +280,25 @@ export class QueryBuilder<T extends object> {
         const { sql, params } = this.toSQL();
         const result = await getQueryRunner().query(sql, params);
         return result.rows.map((row: any) => hydrateEntity(this.entityClass, row));
+    }
+
+    async paginate(request: PageRequest): Promise<Page<T>> {
+        request.sorts.forEach((sort) => {
+            this.orders.push({ column: assertSafeIdentifier(sort.column), direction: sort.direction });
+        });
+
+        const { sql: whereSql, params: whereParams } = this.buildWhereClause(1);
+        const countSql = `SELECT COUNT(*)::int AS count FROM ${this.table}${this.buildJoinClause()}${whereSql}`;
+        const countResult = await getQueryRunner().query(countSql, whereParams);
+        const totalElements = Number(countResult.rows[0]?.count ?? 0);
+
+        if (totalElements === 0) {
+            return buildPage([], request, 0);
+        }
+
+        this.limit(request.size).offset(request.offset);
+        const content = await this.get();
+        return buildPage(content, request, totalElements);
     }
 
     async first(): Promise<T | null> {
