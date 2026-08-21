@@ -1,4 +1,4 @@
-import { logger } from "@config/logger";
+import { getFrameworkLogger } from "@core/framework-logger";
 import { getActiveTransactionClient, getDatabaseDriver, runInTransactionContext } from "@database/transaction-context";
 
 export function Transactional() {
@@ -23,7 +23,7 @@ export function Transactional() {
                     runInTransactionContext(tx, () => originalMethod.apply(this, args))
                 );
             } catch (err) {
-                logger.warn({ method: propertyKey }, "Transactional rolled back");
+                getFrameworkLogger().warn({ method: propertyKey }, "Transactional rolled back");
                 throw err;
             }
         };

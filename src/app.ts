@@ -3,11 +3,13 @@ import "./container";
 import { container } from "@di/container";
 import { NodeHttpAdapter } from "@http/adapters/node.adapter";
 import { errorHandler } from "@middlewares/error-handler.middleware";
-import { securityMiddlewares } from "@middlewares/security.middleware";
+import { createSecurityMiddlewares } from "@middlewares/security.middleware";
 import { requestLogger } from "@middlewares/request-logger.middleware";
 import { notFoundHandler } from "@middlewares/not-found.middleware";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
+import { setFrameworkLogger } from "@core/framework-logger";
+import { setFrameworkConfig, ConfigPort } from "@core/framework-config";
 import { printStartupBanner } from "@config/startup-banner";
 import { mountControllers, listRegisteredRoutes } from "@config/router-factory";
 import { runPreDestroyHooks } from "@decorators/lifecycle.decorator";
@@ -18,13 +20,35 @@ import { cacheManager, hasRedisConfigured } from "@decorators/cache.decorator";
 import { connectRedis, isRedisEnabled, RedisCacheStore } from "@database/nosql/redis.connection";
 import { connectMongo } from "@database/nosql/mongo.connection";
 
+setFrameworkLogger(logger);
+
+const envConfigAdapter: ConfigPort = {
+    get: (key) => {
+        const value = (env as Record<string, unknown>)[key];
+        return value === undefined || value === null || value === "" ? undefined : String(value);
+    },
+    getNumber: (key) => {
+        const value = (env as Record<string, unknown>)[key];
+        if (value === undefined || value === null || value === "") return undefined;
+        const parsed = Number(value);
+        return Number.isNaN(parsed) ? undefined : parsed;
+    },
+    getBoolean: (key) => {
+        const value = (env as Record<string, unknown>)[key];
+        if (value === undefined || value === null || value === "") return undefined;
+        return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+    },
+};
+
+setFrameworkConfig(envConfigAdapter);
+
 const httpAdapter = new NodeHttpAdapter({
   bodyLimitBytes: 10 * 1024,
   notFoundHandler,
   errorHandler,
 });
 
-httpAdapter.use(...securityMiddlewares);
+httpAdapter.use(...createSecurityMiddlewares());
 httpAdapter.use(requestLogger());
 
 async function bootstrap() {

@@ -1,6 +1,5 @@
 import path from "path";
 import { loadEnv } from "@config/load-env";
-import { env } from "@config/env";
 import { createDatabaseDriver } from "./driver.factory";
 import { MigrationRunner } from "./migration-runner";
 

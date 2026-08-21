@@ -1,6 +1,6 @@
 import "@lang/reflect-metadata";
 import { container } from "@di/container";
-import { logger } from "@config/logger";
+import { getFrameworkLogger } from "@core/framework-logger";
 import { Bean } from "@decorators/bean.decorator";
 
 const listeners: { eventType: string; target: Function; methodName: string }[] = [];
@@ -36,7 +36,7 @@ export class EventBus implements IEventBus {
                     const instance = container.resolve(listener.target as new (...args: any[]) => any);
                     await instance[listener.methodName](payload);
                 } catch (err) {
-                    logger.error(
+                    getFrameworkLogger().error(
                         { err, eventType, listener: `${listener.target.name}.${listener.methodName}` },
                         `Event listener failed for "${eventType}"`
                     );

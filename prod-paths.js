@@ -5,6 +5,7 @@ register({
     paths: {
         "@auth/*": ["auth/*"],
         "@config/*": ["config/*"],
+        "@core/*": ["core/*"],
         "@controllers/*": ["controllers/*"],
         "@database/*": ["database/*"],
         "@decorators/*": ["decorators/*"],

@@ -1,4 +1,4 @@
-import { IAuthService } from "@auth/auth.service.interface";
+import { IAuthService } from "@services/auth.service.interface";
 import { AutoWired } from "@decorators/autowired.decorator";
 import { Post, RestController } from "@decorators/route.decorator";
 import { ResponseStatus } from "@decorators/response.decorator";

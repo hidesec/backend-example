@@ -3,11 +3,11 @@ import { LoginRequestDto } from "@dto/login.dto";
 import { Bean } from "@decorators/bean.decorator";
 import { UnauthorizedException } from "@exceptions/http-exceptions";
 import { IUserRepository } from "@repositories/user.repository.interface";
-import { verifyPassword } from "./crypto.util";
+import { verifyPassword } from "@auth/crypto.util";
 import { IAuthService, LoginResponse } from "./auth.service.interface";
-import { IJwtService } from "./jwt.service.interface";
-import { REFRESH_TOKEN_TTL } from "./jwt.service";
-import { IRefreshTokenStore } from "./refresh-token.store.interface";
+import { IJwtService } from "@auth/jwt.service.interface";
+import { REFRESH_TOKEN_TTL } from "@auth/jwt.service";
+import { IRefreshTokenStore } from "@auth/refresh-token.store.interface";
 
 @Bean("IAuthService")
 export class AuthService implements IAuthService {

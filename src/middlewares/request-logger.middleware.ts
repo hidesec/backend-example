@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { logger } from "@config/logger";
+import { getFrameworkLogger } from "@core/framework-logger";
 import { SolumLogger, SolumMiddleware } from "@http/http-types";
 
 export function requestLogger(): SolumMiddleware {
@@ -7,7 +7,7 @@ export function requestLogger(): SolumMiddleware {
         const reqId = randomUUID();
         const start = process.hrtime.bigint();
 
-        const requestLogger: SolumLogger = logger.child({ reqId });
+        const requestLogger: SolumLogger = getFrameworkLogger().child({ reqId });
         (req as { log: SolumLogger }).log = requestLogger;
 
         res.raw.on("finish", () => {

@@ -1,10 +1,10 @@
-import { logger } from "@config/logger";
+import { getFrameworkLogger } from "@core/framework-logger";
 import { HttpException } from "@exceptions/http-exceptions";
 import { SolumRequest, SolumResponse } from "@http/http-types";
 
 export function errorHandler(err: Error, req: SolumRequest, res: SolumResponse): void {
     if (err instanceof HttpException) {
-        logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
+        getFrameworkLogger().warn({ path: req.path, statusCode: err.statusCode }, err.message);
         res.status(err.statusCode).json({
             status: "error",
             message: err.message,
@@ -12,7 +12,7 @@ export function errorHandler(err: Error, req: SolumRequest, res: SolumResponse):
         return;
     }
 
-    logger.error({ err, path: req.path }, "Unhandled exception");
+    getFrameworkLogger().error({ err, path: req.path }, "Unhandled exception");
     res.status(500).json({
         status: "error",
         message: "Internal Server Error",

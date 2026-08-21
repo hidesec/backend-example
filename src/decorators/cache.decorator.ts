@@ -1,4 +1,5 @@
-import { env } from "@config/env";
+import { getFrameworkConfig } from "@core/framework-config";
+
 import { Around, JoinPoint } from "@decorators/aspect.decorator";
 
 export interface CacheStore {
@@ -122,5 +123,5 @@ export function CacheEvict(cacheName: string) {
 }
 
 export function hasRedisConfigured(): boolean {
-    return env.REDIS_URL !== "";
+    return getFrameworkConfig().get("REDIS_URL") !== undefined;
 }

@@ -1,15 +1,23 @@
 import fs from "fs";
 import path from "path";
 
-const SCAN_DIRS = ["repositories", "services", "config/beans", "controllers", "advice", "auth", "tasks"];
+const EXCLUDED_DIRS = new Set(["database", "lang", "core", "__test__", "__tests__", "migrations"]);
 
-export function componentScan(baseDir: string): void {
-    SCAN_DIRS.forEach((dir) => {
+export function componentScan(baseDir: string, dirs?: string[]): void {
+    const targets = dirs ?? discoverSubdirs(baseDir);
+
+    targets.forEach((dir) => {
         const fullDir = path.join(baseDir, dir);
         if (fs.existsSync(fullDir)) {
             walk(fullDir);
         }
     })
+}
+
+function discoverSubdirs(baseDir: string): string[] {
+    return fs.readdirSync(baseDir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && !EXCLUDED_DIRS.has(entry.name))
+        .map((entry) => entry.name);
 }
 
 function walk(dir: string): void {

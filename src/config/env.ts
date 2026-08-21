@@ -37,6 +37,7 @@ const SCHEMA: Record<string, FieldSpec> = {
     DB_PASSWORD: { requiredWhen: (e) => e.DB_CLIENT !== "sqlite" },
     MONGO_URL: {},
     REDIS_URL: {},
+    CORS_ORIGIN: {},
 };
 
 function validate(spec: FieldSpec, key: string, raw: string | undefined, current: Record<string, EnvValue>): EnvValue {

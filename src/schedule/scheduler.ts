@@ -1,6 +1,6 @@
 import "@lang/reflect-metadata";
 import { container } from "@di/container";
-import { logger } from "@config/logger";
+import { getFrameworkLogger } from "@core/framework-logger";
 
 interface ScheduledTask {
     className: string;
@@ -118,7 +118,7 @@ async function executeTask(task: ScheduledTask, instance: any): Promise<void> {
     try {
         await instance[task.methodName]();
     } catch (err) {
-        logger.error({ err, task: `${task.className}.${task.methodName}` }, "Scheduled task failed");
+        getFrameworkLogger().error({ err, task: `${task.className}.${task.methodName}` }, "Scheduled task failed");
     }
 }
 
@@ -154,9 +154,9 @@ export function startScheduledTasks(): void {
             } else {
                 scheduleInterval(task, instance);
             }
-            logger.info({ task: `${task.className}.${task.methodName}`, expression: task.expression }, "[@Scheduled] registered");
+            getFrameworkLogger().info({ task: `${task.className}.${task.methodName}`, expression: task.expression }, "[@Scheduled] registered");
         } catch (err) {
-            logger.error({ err, task: `${task.className}.${task.methodName}` }, "[@Scheduled] failed to register");
+            getFrameworkLogger().error({ err, task: `${task.className}.${task.methodName}` }, "[@Scheduled] failed to register");
         }
     });
 }

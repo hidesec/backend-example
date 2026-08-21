@@ -1,4 +1,4 @@
-import { env } from "@config/env";
+import { getFrameworkConfig } from "@core/framework-config";
 import { SolumMiddleware, SolumRequest, SolumResponse, SolumNext } from "@http/http-types";
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -100,14 +100,17 @@ function rateLimit(options: RateLimitOptions): SolumMiddleware {
     };
 }
 
-export const securityMiddlewares: SolumMiddleware[] = [
-    securityHeaders(),
-    cors({
-        origin: env.NODE_ENV === "production" ? "https://myproductiondomain.com" : "*",
-        credentials: true,
-    }),
-    rateLimit({
-        windowMs: 15 * 60 * 1000,
-        max: env.RATE_LIMIT_MAX,
-    }),
-];
+export function createSecurityMiddlewares(): SolumMiddleware[] {
+    const config = getFrameworkConfig();
+    return [
+        securityHeaders(),
+        cors({
+            origin: config.get("CORS_ORIGIN") ?? "*",
+            credentials: true,
+        }),
+        rateLimit({
+            windowMs: 15 * 60 * 1000,
+            max: config.getNumber("RATE_LIMIT_MAX") ?? 100,
+        }),
+    ];
+}

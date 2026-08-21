@@ -1,11 +1,12 @@
 import {
   ColumnMetadata, EntityMetadata, ForeignKeyMetadata, getAllEntities,
 } from "@decorators/orm/column.decorator";
-import { env } from "@config/env";
+import { getFrameworkConfig } from "@core/framework-config";
 import { Dialect, getDialect } from "@database/core/dialect";
+import { DbClientName } from "@database/core/types";
 
 function activeDialect(): Dialect {
-  return getDialect(env.DB_CLIENT);
+  return getDialect((getFrameworkConfig().get("DB_CLIENT") ?? "postgres") as DbClientName);
 }
 
 function buildColumnLine(dialect: Dialect, col: ColumnMetadata): string {

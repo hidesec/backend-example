@@ -1,4 +1,5 @@
-import { env } from "@config/env";
+import { getFrameworkConfig } from "@core/framework-config";
+
 import { CacheStore } from "@decorators/cache.decorator";
 
 type RedisClientV4 = {
@@ -64,5 +65,5 @@ export class RedisCacheStore implements CacheStore {
 }
 
 export function isRedisEnabled(): boolean {
-    return env.REDIS_URL !== "";
+    return getFrameworkConfig().get("REDIS_URL") !== undefined;
 }

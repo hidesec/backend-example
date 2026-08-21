@@ -1,5 +1,3 @@
-import { env } from "@config/env";
-
 type MongoDbHandle = {
     command(options: object): Promise<Record<string, unknown>>;
     databaseName: string;

@@ -1,6 +1,6 @@
 import "@lang/reflect-metadata";
 import { container } from "@di/container";
-import { logger } from "@config/logger";
+import { getFrameworkLogger } from "@core/framework-logger";
 
 const POST_CONSTRUCT_METADATA_KEY = "custom:post-construct";
 const PRE_DESTROY_METADATA_KEY = "custom:pre-destroy";
@@ -70,9 +70,9 @@ export async function runPreDestroyHooks(): Promise<void> {
     for (const entry of destroyRegistry) {
         try {
             await entry.destroy();
-            logger.info(`[@PreDestroy] ${entry.description} cleaned up`);
+            getFrameworkLogger().info(`[@PreDestroy] ${entry.description} cleaned up`);
         } catch (err) {
-            logger.error({ err }, `[@PreDestroy] ${entry.description} failed to clean up`);
+            getFrameworkLogger().error({ err }, `[@PreDestroy] ${entry.description} failed to clean up`);
         }
     }
 }
