@@ -42,7 +42,7 @@ export class QueryBuilder<T extends object> {
     private wheres: WhereCondition[] = [];
     private joins: JoinClause[] = [];
     private orders: OrderClause[] = [];
-    private selectColumns: string[] = [];
+    private selectColumns: string[] = ["*"];
     private groupByColumns: string[] = [];
     private limitValue?: number;
     private offsetValue?: number;

@@ -47,4 +47,12 @@ export class UserService implements IUserService {
         }
         return user;
     }
+
+    @LogExecution()
+    async findRecentByEmails(emails: string[], limit: number): Promise<User[]> {
+        if (emails.length === 0) {
+            throw new BadRequestException("emails must not be empty");
+        }
+        return this.userRepository.findRecentByEmails(emails, limit);
+    }
 }

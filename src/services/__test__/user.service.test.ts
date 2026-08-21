@@ -11,6 +11,7 @@ describe("UserService", () => {
         mockRepo = {
             findById: jest.fn(),
             findByEmail: jest.fn(),
+            findRecentByEmails: jest.fn(),
             findAll: jest.fn(),
             findAllById: jest.fn(),
             existsById: jest.fn(),

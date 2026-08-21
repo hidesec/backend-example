@@ -4,6 +4,7 @@ import { ControllerAdvice, ExceptionHandler } from "@decorators/exception-handle
 import {
     BadRequestException,
     HttpException,
+    InvalidQueryParameterException,
     NotFoundException,
     ServiceUnavailableException,
 } from "@exceptions/http-exceptions";
@@ -20,6 +21,12 @@ export class GlobalExceptionAdvice {
     handleBadRequest(err: BadRequestException, req: Request) {
         logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
         return { status: "error", code: "BAD_REQUEST", message: err.message };
+    }
+
+    @ExceptionHandler(InvalidQueryParameterException)
+    handleInvalidQueryParameter(err: InvalidQueryParameterException, req: Request) {
+        logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
+        return { status: "error", code: "INVALID_QUERY_PARAMETER", message: err.message };
     }
 
     @ExceptionHandler(ServiceUnavailableException)

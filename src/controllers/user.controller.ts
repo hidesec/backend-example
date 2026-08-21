@@ -6,8 +6,8 @@ import { RestController, Get, Post } from "@decorators/route.decorator";
 import { ResponseStatus } from "@decorators/response.decorator";
 import { AutoWired } from "@decorators/autowired.decorator";
 import { ExceptionHandler } from "@decorators/exception-handler.decorator";
-import { Body, Param, Req, Valid } from "@decorators/param.decorator";
-import { BadRequestException } from "@exceptions/http-exceptions";
+import { Body, Param, Query, Req, Valid } from "@decorators/param.decorator";
+import { BadRequestException, InvalidQueryParameterException } from "@exceptions/http-exceptions";
 
 @RestController("/users")
 export class UserController {
@@ -21,6 +21,30 @@ export class UserController {
         const user = await this.userService.createUser(dto);
         req.log.info({ userId: user.id }, "User created successfully");
         return user;
+    }
+
+    @Get("/recent")
+    @ResponseStatus(200)
+    async findRecentByEmails(
+        @Query("emails") emails: string,
+        @Query("limit") limit: string,
+        @Req() req: Request
+    ) {
+        const emailList = (emails ?? "")
+            .split(",")
+            .map((e) => e.trim())
+            .filter(Boolean);
+
+        if (emailList.length === 0) {
+            throw new InvalidQueryParameterException("Query param 'emails' is required (comma-separated list of emails)");
+        }
+
+        const parsedLimit = Math.min(Math.max(parseInt(limit ?? "10", 10) || 10, 1), 100);
+
+        req.log.info({ emails: emailList, limit: parsedLimit }, "Finding recent users by emails");
+
+        const users = await this.userService.findRecentByEmails(emailList, parsedLimit);
+        return users.map(UserResponseDto.fromEntity);
     }
 
     @Get("/:id")

@@ -18,6 +18,12 @@ export class BadRequestException extends HttpException {
     }
 }
 
+export class InvalidQueryParameterException extends HttpException {
+    constructor(message: string) {
+        super(400, message);
+    }
+}
+
 export class ServiceUnavailableException extends HttpException {
     constructor(message: string) {
         super(503, message);
