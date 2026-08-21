@@ -197,10 +197,6 @@ export function UpdatedAtColumn() {
   };
 }
 
-// ─────────────────────────────────────────────
-// RELATIONS
-// ─────────────────────────────────────────────
-
 function tableNameOf(entityFn: () => Function): string {
   const target = entityFn();
   const meta = ENTITIES.get(target);

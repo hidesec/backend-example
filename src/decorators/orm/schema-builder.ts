@@ -129,7 +129,6 @@ export function buildDropTableSQL(entity: EntityMetadata, dialect: Dialect = act
   return sql;
 }
 
-/** DOWN migration untuk join table @ManyToMany — harus di-drop SEBELUM tabel utama */
 export function buildDropJoinTableSQL(entity: EntityMetadata, dialect: Dialect = activeDialect()): string[] {
   return entity.manyToMany
     .map((rel) => {

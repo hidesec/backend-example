@@ -132,10 +132,6 @@ export class MigrationRunner {
     });
   }
 
-  /**
-   * Migrasi spesifik dialek bisa diletakkan di migrations/<client>/,
-   * fallback ke migrations/ umum jika folder tersebut tidak ada.
-   */
   private dialectSpecificDir(): string {
     const specific = path.join(this.migrationsDir, this.driver.clientName);
     if (fs.existsSync(specific)) return specific;

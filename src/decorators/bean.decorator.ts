@@ -14,11 +14,6 @@ interface BeanDefinition {
     destroyMethod?: string;
 }
 
-/**
- * 
- * @param token 
- * @returns 
- */
 export function Bean(token?: string, options?: BeanMethodOptions) {
     return function (target: any, propertyKey?: string, _descriptor?: PropertyDescriptor) {
         if (propertyKey === undefined) {
