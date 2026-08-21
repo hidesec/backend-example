@@ -1,19 +1,18 @@
-// config/startup-banner.ts
+import { styleText } from "util";
 import { env } from "./env";
-import chalk from "chalk"; // opsional, untuk warna
 
 export function printStartupBanner(port: number): void {
   const banner = `
-${chalk.cyan("╔══════════════════════════════════════════════╗")}
-${chalk.green("         Server started successfully")}
-${chalk.dim("  Environment")} : ${chalk.yellow(env.NODE_ENV)}
-${chalk.dim("  Port")}        : ${chalk.yellow(port)}
-${chalk.dim("  URL")}         : ${chalk.blue(`http://localhost:${port}`)}
-${chalk.dim("  Health")}      : ${chalk.blue(`http://localhost:${port}/health`)}
-${chalk.dim("  PID")}         : ${process.pid}
-${chalk.dim("  Node")}        : ${process.version}
-${chalk.cyan("╚══════════════════════════════════════════════╝")}
+${styleText("cyan", "╔══════════════════════════════════════════════╗")}
+${styleText("green", "         Server started successfully")}
+${styleText("dim", "  Environment")} : ${styleText("yellow", env.NODE_ENV)}
+${styleText("dim", "  Port")}        : ${styleText("yellow", String(port))}
+${styleText("dim", "  URL")}         : ${styleText("blue", `http://localhost:${port}`)}
+${styleText("dim", "  Health")}      : ${styleText("blue", `http://localhost:${port}/health`)}
+${styleText("dim", "  PID")}         : ${process.pid}
+${styleText("dim", "  Node")}        : ${process.version}
+${styleText("cyan", "╚══════════════════════════════════════════════╝")}
 `;
 
-  console.log(banner); // ← langsung console.log, bukan logger.info
+  console.log(banner);
 }

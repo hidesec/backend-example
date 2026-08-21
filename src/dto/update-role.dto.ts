@@ -1,4 +1,4 @@
-import { IsIn } from "class-validator";
+import { IsIn } from "@validation/decorators";
 import { USER_ROLES, UserRole } from "@auth/roles";
 
 export class UpdateRoleDto {

@@ -1,6 +1,5 @@
-import { container } from "tsyringe";
-import { plainToInstance } from "class-transformer";
-import { validate } from "class-validator";
+import { container } from "@di/container";
+import { toInstance, validateInstance } from "@validation/validate";
 import { getRegisteredControllers, getRoutesMetadata } from "@decorators/route.decorator";
 import { getResponseStatus } from "@decorators/response.decorator";
 import {
@@ -115,8 +114,8 @@ async function resolveHandlerArgs(
             }
 
             const options: ValidOptions = meta.validateOptions ?? {};
-            const instance = plainToInstance(dtoClass, value);
-            const errors = await validate(instance as object, {
+            const instance = toInstance(dtoClass, value);
+            const errors = validateInstance(instance as object, {
                 whitelist: options.whitelist ?? false,
                 forbidNonWhitelisted: options.forbidNonWhitelisted ?? false,
             });

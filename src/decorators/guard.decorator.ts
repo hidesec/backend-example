@@ -1,5 +1,5 @@
-import "reflect-metadata";
-import { container } from "tsyringe";
+import "@lang/reflect-metadata";
+import { container } from "@di/container";
 import { ForbiddenException } from "@exceptions/http-exceptions";
 import { SolumRequest, SolumResponse } from "@http/http-types";
 

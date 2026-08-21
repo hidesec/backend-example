@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import { container } from "tsyringe";
+import { container } from "@di/container";
 import { logger } from "@config/logger";
 import { getActiveTransactionClient, runInTransactionContext } from "@database/transaction-context";
 

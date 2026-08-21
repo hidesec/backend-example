@@ -1,3 +1,5 @@
+import type { IncomingMessage, ServerResponse } from "http";
+
 export interface SolumLogger {
     info(obj: object, msg?: string): void;
     warn(obj: object, msg?: string): void;
@@ -9,10 +11,10 @@ export interface SolumRequest {
     path: string;
     params: Record<string, string>;
     query: Record<string, unknown>;
-    headers:Record<string, string | string[] | undefined>;
+    headers: Record<string, string | string[] | undefined>;
     body: any;
     log: SolumLogger;
-    raw: unknown;
+    raw: IncomingMessage;
 }
 
 export interface SolumResponse {
@@ -20,9 +22,11 @@ export interface SolumResponse {
     json(body: unknown): void;
     end(): void;
     readonly headersSent: boolean;
-    raw: unknown;
+    raw: ServerResponse;
 }
 
 export type SolumNext = (err?: unknown) => void;
 
 export type SolumHandler = (req: SolumRequest, res: SolumResponse, next: SolumNext) => unknown;
+
+export type SolumMiddleware = (req: SolumRequest, res: SolumResponse, next: SolumNext) => void | Promise<void>;

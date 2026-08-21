@@ -1,4 +1,4 @@
-import "reflect-metadata";
+import "@lang/reflect-metadata";
 
 export enum ParamSource {
     BODY = "body",

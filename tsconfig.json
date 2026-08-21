@@ -15,15 +15,18 @@
             "@controllers/*": ["controllers/*"],
             "@database/*": ["database/*"],
             "@decorators/*": ["decorators/*"],
+            "@di/*": ["di/*"],
             "@dto/*": ["dto/*"],
             "@entities/*": ["entities/*"],
             "@events/*": ["events/*"],
             "@http/*": ["http/*"],
             "@exceptions/*": ["exceptions/*"],
+            "@lang/*": ["lang/*"],
             "@middlewares/*": ["middlewares/*"],
             "@repositories/*": ["repositories/*"],
             "@schedule/*": ["schedule/*"],
-            "@services/*": ["services/*"]
+            "@services/*": ["services/*"],
+            "@validation/*": ["validation/*"]
         }
     }
 }

@@ -1,30 +1,27 @@
-import "reflect-metadata";
+import "@lang/reflect-metadata";
 import "./container";
-import express from "express";
-import { ExpressHttpAdapter, toExpressErrorHandler, toExpressNotFoundHandler } from "@http/adapters/express.adapter";
+import { NodeHttpAdapter } from "@http/adapters/node.adapter";
 import { errorHandler } from "@middlewares/error-handler.middleware";
 import { securityMiddlewares } from "@middlewares/security.middleware";
-import pinoHttp from "pino-http";
-import { logger } from "@config/logger";
+import { requestLogger } from "@middlewares/request-logger.middleware";
 import { notFoundHandler } from "@middlewares/not-found.middleware";
 import { env } from "@config/env";
+import { logger } from "@config/logger";
 import { printStartupBanner } from "@config/startup-banner";
 import { mountControllers, listRegisteredRoutes } from "@config/router-factory";
 import { runPreDestroyHooks } from "@decorators/lifecycle.decorator";
 import { startScheduledTasks, stopScheduledTasks } from "@schedule/scheduler";
 
-const rawApp = express();
+const httpAdapter = new NodeHttpAdapter({
+  bodyLimitBytes: 10 * 1024,
+  notFoundHandler,
+  errorHandler,
+});
 
-rawApp.use(...securityMiddlewares);
-rawApp.use(express.json({ limit: "10kb" }));
-rawApp.use(pinoHttp({ logger }));
-
-const httpAdapter = new ExpressHttpAdapter(rawApp);
+httpAdapter.use(...securityMiddlewares);
+httpAdapter.use(requestLogger());
 
 mountControllers(httpAdapter);
-
-rawApp.use(toExpressNotFoundHandler(notFoundHandler));
-rawApp.use(toExpressErrorHandler(errorHandler));
 
 const server = httpAdapter.listen(env.PORT, () => {
   printStartupBanner(env.PORT);

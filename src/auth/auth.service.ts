@@ -1,4 +1,4 @@
-import { inject } from "tsyringe";
+import { inject } from "@di/container";
 import { LoginRequestDto } from "@dto/login.dto";
 import { Bean } from "@decorators/bean.decorator";
 import { UnauthorizedException } from "@exceptions/http-exceptions";

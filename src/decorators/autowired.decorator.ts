@@ -1,5 +1,5 @@
-import "reflect-metadata";
-import { container } from "tsyringe";
+import "@lang/reflect-metadata";
+import { container } from "@di/container";
 
 const AUTOWIRED_CACHE_KEY = Symbol("autowired-cache");
 

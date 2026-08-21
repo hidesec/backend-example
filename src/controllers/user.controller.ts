@@ -14,7 +14,7 @@ import { AutoWired } from "@decorators/autowired.decorator";
 import { ExceptionHandler } from "@decorators/exception-handler.decorator";
 import { UseGuards, Roles } from "@decorators/guard.decorator";
 import { Body, CurrentUser, Param, Query, Req, Valid } from "@decorators/param.decorator";
-import { BadRequestException, InvalidQueryParameterException } from "@exceptions/http-exceptions";
+import { ConflictException, InvalidQueryParameterException } from "@exceptions/http-exceptions";
 
 @RestController("/users")
 export class UserController {
@@ -105,8 +105,8 @@ export class UserController {
         return UserResponseDto.fromEntity(await this.userService.updateRole(id, dto.role as UserRole));
     }
 
-    @ExceptionHandler(BadRequestException)
-    handleDuplicateEmail(err: BadRequestException, req: SolumRequest) {
+    @ExceptionHandler(ConflictException)
+    handleDuplicateEmail(err: ConflictException, req: SolumRequest) {
         req.log.warn({ path: req.path }, err.message);
         return { status: "error", code: "USER_EMAIL_CONFLICT", message: err.message };
     }

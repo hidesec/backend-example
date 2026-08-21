@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "async_hooks";
 import { Pool, PoolClient } from "pg";
-import { container } from "tsyringe";
+import { container } from "@di/container";
 
 type Queryable = Pick<Pool | PoolClient, "query">;
 

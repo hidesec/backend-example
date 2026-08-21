@@ -1,5 +1,5 @@
-import "reflect-metadata";
-import { container, injectable } from "tsyringe";
+import "@lang/reflect-metadata";
+import { container } from "@di/container";
 import { registerDestroyHook, registerLifecycleHooks } from "@decorators/lifecycle.decorator";
 
 const BEAN_METADATA_KEY = "custom:bean-methods";
@@ -22,7 +22,6 @@ interface BeanDefinition {
 export function Bean(token?: string, options?: BeanMethodOptions) {
     return function (target: any, propertyKey?: string, _descriptor?: PropertyDescriptor) {
         if (propertyKey === undefined) {
-            injectable()(target);
             const registrationToken = token ?? target.name;
             container.register(registrationToken, { useClass: target });
             registerLifecycleHooks(registrationToken, target);

@@ -1,6 +1,6 @@
 /// <reference types="jest" />
-import "reflect-metadata";
-import { container } from "tsyringe";
+import "@lang/reflect-metadata";
+import { container } from "@di/container";
 import { IUserRepository } from "@repositories/user.repository.interface";
 import { IEventBus } from "@events/event-bus";
 import { UserService } from "@services/user.service";

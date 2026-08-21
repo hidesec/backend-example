@@ -2,9 +2,9 @@ import { IUserRepository } from "@repositories/user.repository.interface";
 import { IUserService } from "./user.service.interface";
 import { CreateUserDto } from "@dto/create-user.dto";
 import { User } from "@entities/user.entity";
-import { BadRequestException, NotFoundException } from "@exceptions/http-exceptions";
+import { BadRequestException, ConflictException, NotFoundException } from "@exceptions/http-exceptions";
 import { Bean } from "@decorators/bean.decorator";
-import { inject } from "tsyringe";
+import { inject } from "@di/container";
 import { randomUUID } from "crypto";
 import { Transactional } from "@decorators/transactional.decorator";
 import { Auditable } from "@decorators/auditable.decorator";
@@ -38,7 +38,7 @@ export class UserService implements IUserService {
         const id = randomUUID();
         const existing = await this.userRepository.findByEmail(dto.email);
         if(existing) {
-            throw new BadRequestException(`Email ${dto.email} is already registered`);
+            throw new ConflictException(`Email ${dto.email} is already registered`);
         }
 
         const user = new User(id, dto.name, dto.email);

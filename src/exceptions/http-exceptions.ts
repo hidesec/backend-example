@@ -24,6 +24,12 @@ export class InvalidQueryParameterException extends HttpException {
     }
 }
 
+export class ConflictException extends HttpException {
+    constructor(message: string) {
+        super(409, message);
+    }
+}
+
 export class ServiceUnavailableException extends HttpException {
     constructor(message: string) {
         super(503, message);
@@ -39,5 +45,11 @@ export class UnauthorizedException extends HttpException {
 export class ForbiddenException extends HttpException {
     constructor(message: string = "Forbidden") {
         super(403, message);
+    }
+}
+
+export class PayloadTooLargeException extends HttpException {
+    constructor(message: string = "Payload too large") {
+        super(413, message);
     }
 }

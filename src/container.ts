@@ -1,4 +1,4 @@
-import "reflect-metadata";
+import "@lang/reflect-metadata";
 import path from "path";
 import { componentScan } from "@config/component-scan";
 

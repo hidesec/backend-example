@@ -1,9 +1,9 @@
 import path from "path";
 import { Pool } from "pg";
-import dotenv from "dotenv";
+import { loadEnv } from "@config/load-env";
 import { MigrationRunner } from "./migration-runner";
 
-dotenv.config();
+loadEnv();
 
 async function main() {
     const command = process.argv[2] ?? "up";

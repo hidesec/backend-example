@@ -1,4 +1,4 @@
-import "reflect-metadata";
+import "@lang/reflect-metadata";
 
 const RESPONSE_STATUS_METADATA_KEY = "custom:response-status";
 

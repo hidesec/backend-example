@@ -1,5 +1,5 @@
-import "reflect-metadata";
-import { container } from "tsyringe";
+import "@lang/reflect-metadata";
+import { container } from "@di/container";
 import { logger } from "@config/logger";
 
 const POST_CONSTRUCT_METADATA_KEY = "custom:post-construct";
@@ -40,7 +40,7 @@ export function registerLifecycleHooks(token: string | (new (...args: any[]) => 
     container.afterResolution(
         token as any,
         (_resolvedToken, result) => {
-            const instance = Array.isArray(result) ? result[0] : result;
+            const instance = result as Record<string, () => unknown>;
             if (!instance) return;
 
             for (const methodName of postConstructMethods) {
@@ -58,8 +58,7 @@ export function registerLifecycleHooks(token: string | (new (...args: any[]) => 
                     },
                 });
             }
-        },
-        { frequency: "Always" }
+        }
     );
 }
 
