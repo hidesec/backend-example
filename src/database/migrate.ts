@@ -1,6 +1,7 @@
 import path from "path";
-import { Pool } from "pg";
 import { loadEnv } from "@config/load-env";
+import { env } from "@config/env";
+import { createDatabaseDriver } from "./driver.factory";
 import { MigrationRunner } from "./migration-runner";
 
 loadEnv();
@@ -8,16 +9,9 @@ loadEnv();
 async function main() {
     const command = process.argv[2] ?? "up";
 
-    const pool = new Pool({
-        host: process.env.DB_HOST,
-        port: Number(process.env.DB_PORT) || 5432,
-        database: process.env.DB_NAME,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-    });
-
+    const driver = await createDatabaseDriver();
     const migrationsDir = path.join(__dirname, "migrations");
-    const runner = new MigrationRunner(pool, migrationsDir);
+    const runner = new MigrationRunner(driver, migrationsDir);
 
     try {
         switch(command) {
@@ -40,7 +34,7 @@ async function main() {
         console.error("Migration failed:", err);
         process.exit(1);
     } finally {
-        await pool.end();
+        await driver.close();
     }
 }
 

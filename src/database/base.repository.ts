@@ -4,8 +4,9 @@ import {
 } from "@decorators/orm/column.decorator";
 import { RelationLoader } from "@decorators/orm/relation-loader";
 import { QueryBuilder } from "@decorators/orm/query-builder";
-import { getQueryRunner } from "@database/transaction-context";
+import { getDatabaseDriver, getQueryRunner } from "@database/transaction-context";
 import { IBaseRepository } from "@database/base-repository.interface";
+import { QueryResult } from "@database/core/types";
 import { Page, PageRequest } from "@http/pagination";
 
 export abstract class BaseRepository<T extends object, ID = string> implements IBaseRepository<T, ID> {
@@ -19,7 +20,7 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
     }
 
     protected get qualifiedTable(): string {
-        return `${this.meta.schemaName}.${this.meta.tableName}`;
+        return getDatabaseDriver().dialect.qualifyTable(this.meta.schemaName, this.meta.tableName);
     }
 
     protected get primaryColumn(): ColumnMetadata {
@@ -119,7 +120,11 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
     async findAllById(ids: ID[]): Promise<T[]> {
         if (ids.length === 0) return [];
         const pk = this.primaryColumn;
-        const result = await getQueryRunner().query(`SELECT * FROM ${this.qualifiedTable} WHERE ${pk.columnName} = ANY($1)`, [ids]);
+        const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
+        const result = await getQueryRunner().query(
+            `SELECT * FROM ${this.qualifiedTable} WHERE ${pk.columnName} IN (${placeholders})`,
+            ids
+        );
         return this.hydrateRows(result.rows);
     }
 
@@ -130,7 +135,8 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
     }
 
     async count(): Promise<number> {
-        const result = await getQueryRunner().query(`SELECT COUNT(*)::int AS count FROM ${this.qualifiedTable}`);
+        const countExpr = getDatabaseDriver().dialect.countExpression();
+        const result = await getQueryRunner().query(`SELECT ${countExpr} AS count FROM ${this.qualifiedTable}`);
         return Number(result.rows[0].count);
     }
 
@@ -152,22 +158,27 @@ export abstract class BaseRepository<T extends object, ID = string> implements I
         const columns = this.persistableColumns;
         const insertColumnNames = columns.map((c) => c.columnName);
         const values = columns.map((c) => (entity as any)[c.propertyName]);
-        const placeholders = values.map((_, i) => `$${i + 1}`);
         const updatableColumns = columns.filter((c) => {
             const isPk = "isPrimary" in c && c.isPrimary;
             const isCreatedAt = "isCreatedAt" in c && c.isCreatedAt;
             return !isPk && !isCreatedAt;
+        }).map((c) => c.columnName);
+
+        const plan = getDatabaseDriver().dialect.buildUpsert({
+            table: this.qualifiedTable,
+            columnNames: insertColumnNames,
+            values,
+            pkColumn: pk.columnName,
+            updatableColumns,
         });
-        const updateClause = updatableColumns.length > 0
-            ? `DO UPDATE SET ${updatableColumns.map((c) => `${c.columnName} = EXCLUDED.${c.columnName}`).join(", ")}`
-            : "DO NOTHING";
-        const sql = `
-            INSERT INTO ${this.qualifiedTable} (${insertColumnNames.join(", ")})
-            VALUES (${placeholders.join(", ")})
-            ON CONFLICT (${pk.columnName}) ${updateClause}
-            RETURNING *`;
-        const result = await getQueryRunner().query(sql, values);
-        return this.mapRow(result.rows[0]);
+
+        let lastResult: QueryResult = { rows: [], rowCount: 0 };
+        for (const statement of plan.statements) {
+            lastResult = await getQueryRunner().query(statement.sql, statement.params);
+        }
+
+        const savedRow = lastResult.rows[0];
+        return savedRow ? this.mapRow(savedRow) : entity;
     }
 
     async deleteById(id: ID): Promise<void> {

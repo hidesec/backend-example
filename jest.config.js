@@ -5,7 +5,7 @@ function buildModuleNameMapper() {
     const mapper = {};
     for (const [alias, targets] of Object.entries(paths)) {
         const pattern = `^${alias.replace(/\*/g, "(.*)")}$`;
-        mapper[pattern] = targets.map((target) => `<rootDir>/src/${target.replace(/\*/g, "$1")}`);
+        mapper[pattern] = targets.map((target) => `<rootDir>/${target.replace(/^\.\//, "").replace(/\*/g, "$1")}`);
     }
     return mapper;
 }

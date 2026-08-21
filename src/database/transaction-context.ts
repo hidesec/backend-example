@@ -1,23 +1,31 @@
 import { AsyncLocalStorage } from "async_hooks";
-import { Pool, PoolClient } from "pg";
 import { container } from "@di/container";
+import { DatabaseDriver, DbExecutor } from "./core/types";
 
-type Queryable = Pick<Pool | PoolClient, "query">;
+const DRIVER_TOKEN = "DatabaseDriver";
 
-const transactionStorage = new AsyncLocalStorage<PoolClient>();
+const transactionStorage = new AsyncLocalStorage<DbExecutor>();
 
-export function getQueryRunner(): Queryable {
-    const activeClient = transactionStorage.getStore();
-    if (activeClient) {
-        return activeClient;
-    }
-    return container.resolve<Pool>("DatabasePool");
+export function registerDatabaseDriver(driver: DatabaseDriver): void {
+    container.register(DRIVER_TOKEN, { useValue: driver });
 }
 
-export function getActiveTransactionClient(): PoolClient | undefined {
+export function getDatabaseDriver(): DatabaseDriver {
+    return container.resolve<DatabaseDriver>(DRIVER_TOKEN);
+}
+
+export function getQueryRunner(): DbExecutor {
+    const activeTransaction = transactionStorage.getStore();
+    if (activeTransaction) {
+        return activeTransaction;
+    }
+    return getDatabaseDriver();
+}
+
+export function getActiveTransactionClient(): DbExecutor | undefined {
     return transactionStorage.getStore();
 }
 
-export function runInTransactionContext<T>(client: PoolClient, fn: () => Promise<T>): Promise<T> {
+export function runInTransactionContext<T>(client: DbExecutor, fn: () => Promise<T>): Promise<T> {
     return transactionStorage.run(client, fn);
 }

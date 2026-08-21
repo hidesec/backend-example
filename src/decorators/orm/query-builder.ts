@@ -1,5 +1,6 @@
 import { EntityMetadata, getEntityMetadata, hydrateEntity } from "./column.decorator";
-import { getQueryRunner } from "@database/transaction-context";
+import { getDatabaseDriver, getQueryRunner } from "@database/transaction-context";
+import { QueryResult } from "@database/core/types";
 import { buildPage, Page, PageRequest } from "@http/pagination";
 
 export type WhereOperator = "=" | "!=" | "<>" | ">" | ">=" | "<" | "<=" | "LIKE" | "ILIKE";
@@ -194,10 +195,11 @@ export class QueryBuilder<T extends object> {
 
         this.wheres.forEach((w, i) => {
             const connector = i === 0 ? "" : ` ${w.connector} `;
+            const likeOp = getDatabaseDriver().dialect.likeOperator;
 
             switch (w.type) {
                 case "basic":
-                    parts.push(`${connector}${w.column} ${w.operator} $${paramIndex++}`);
+                    parts.push(`${connector}${w.column} ${likeOp(w.operator!)} $${paramIndex++}`);
                     params.push(w.value);
                     break;
                 case "in": {
@@ -288,7 +290,7 @@ export class QueryBuilder<T extends object> {
         });
 
         const { sql: whereSql, params: whereParams } = this.buildWhereClause(1);
-        const countSql = `SELECT COUNT(*)::int AS count FROM ${this.table}${this.buildJoinClause()}${whereSql}`;
+        const countSql = `SELECT ${getDatabaseDriver().dialect.countExpression()} AS count FROM ${this.table}${this.buildJoinClause()}${whereSql}`;
         const countResult = await getQueryRunner().query(countSql, whereParams);
         const totalElements = Number(countResult.rows[0]?.count ?? 0);
 
@@ -323,10 +325,22 @@ export class QueryBuilder<T extends object> {
         }
         const values = columns.map((c) => (data as any)[c.propertyName]);
         const columnNames = columns.map((c) => c.columnName);
-        const placeholders = values.map((_, i) => `$${i + 1}`).join(", ");
-        const sql = `INSERT INTO ${this.table} (${columnNames.join(", ")}) VALUES (${placeholders}) RETURNING *`;
-        const result = await getQueryRunner().query(sql, values);
-        return hydrateEntity(this.entityClass, result.rows[0]);
+        const pkColumn = this.meta.columns.find((c) => c.isPrimary)?.columnName ?? "id";
+
+        const plan = getDatabaseDriver().dialect.buildInsertReturning({
+            table: this.table,
+            columnNames,
+            values,
+            pkColumn,
+        });
+
+        let lastResult: QueryResult = { rows: [], rowCount: 0 };
+        for (const statement of plan.statements) {
+            lastResult = await getQueryRunner().query(statement.sql, statement.params);
+        }
+
+        const insertedRow = lastResult.rows[0];
+        return insertedRow ? hydrateEntity(this.entityClass, insertedRow) : (data as T);
     }
 
     async update(data: Partial<T>): Promise<number> {

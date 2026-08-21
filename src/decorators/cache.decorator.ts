@@ -1,51 +1,94 @@
+import { env } from "@config/env";
 import { Around, JoinPoint } from "@decorators/aspect.decorator";
 
-interface CacheEntry {
+export interface CacheStore {
+    readonly name: string;
+    get<T>(key: string): Promise<T | undefined>;
+    set(key: string, value: unknown, ttlSeconds: number): Promise<void>;
+    evict(prefix: string): Promise<void>;
+    sweep(): Promise<number>;
+    clear(): Promise<void>;
+}
+
+interface MemoryEntry {
     value: unknown;
     expiresAt: number;
 }
 
-const cacheStore = new Map<string, CacheEntry>();
+export class InMemoryCacheStore implements CacheStore {
+    readonly name = "in-memory";
+    private readonly entries = new Map<string, MemoryEntry>();
 
-export class CacheManager {
-    get<T>(key: string): T | undefined {
-        const entry = cacheStore.get(key);
+    async get<T>(key: string): Promise<T | undefined> {
+        const entry = this.entries.get(key);
         if (!entry) return undefined;
 
         if (entry.expiresAt <= Date.now()) {
-            cacheStore.delete(key);
+            this.entries.delete(key);
             return undefined;
         }
 
         return entry.value as T;
     }
 
-    set(key: string, value: unknown, ttlSeconds: number): void {
-        cacheStore.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
+    async set(key: string, value: unknown, ttlSeconds: number): Promise<void> {
+        this.entries.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
     }
 
-    evict(prefix: string): void {
-        for (const key of cacheStore.keys()) {
+    async evict(prefix: string): Promise<void> {
+        for (const key of this.entries.keys()) {
             if (key === prefix || key.startsWith(`${prefix}:`)) {
-                cacheStore.delete(key);
+                this.entries.delete(key);
             }
         }
     }
 
-    sweep(): number {
+    async sweep(): Promise<number> {
         const now = Date.now();
         let removed = 0;
-        for (const [key, entry] of cacheStore.entries()) {
+        for (const [key, entry] of this.entries.entries()) {
             if (entry.expiresAt <= now) {
-                cacheStore.delete(key);
+                this.entries.delete(key);
                 removed++;
             }
         }
         return removed;
     }
 
-    clear(): void {
-        cacheStore.clear();
+    async clear(): Promise<void> {
+        this.entries.clear();
+    }
+}
+
+export class CacheManager {
+    private store: CacheStore = new InMemoryCacheStore();
+
+    useStore(store: CacheStore): void {
+        this.store = store;
+    }
+
+    get storeName(): string {
+        return this.store.name;
+    }
+
+    get<T>(key: string): Promise<T | undefined> {
+        return this.store.get<T>(key);
+    }
+
+    set(key: string, value: unknown, ttlSeconds: number): Promise<void> {
+        return this.store.set(key, value, ttlSeconds);
+    }
+
+    evict(prefix: string): Promise<void> {
+        return this.store.evict(prefix);
+    }
+
+    sweep(): Promise<number> {
+        return this.store.sweep();
+    }
+
+    clear(): Promise<void> {
+        return this.store.clear();
     }
 }
 
@@ -59,13 +102,13 @@ export function Cacheable(cacheName: string, ttlSeconds: number = 60) {
     return Around(async (joinPoint, proceed) => {
         const key = buildCacheKey(cacheName, joinPoint);
 
-        const cached = cacheManager.get(key);
+        const cached = await cacheManager.get(key);
         if (cached !== undefined) {
             return cached;
         }
 
         const result = await proceed();
-        cacheManager.set(key, result, ttlSeconds);
+        await cacheManager.set(key, result, ttlSeconds);
         return result;
     });
 }
@@ -73,7 +116,11 @@ export function Cacheable(cacheName: string, ttlSeconds: number = 60) {
 export function CacheEvict(cacheName: string) {
     return Around(async (joinPoint, proceed) => {
         const result = await proceed();
-        cacheManager.evict(cacheName);
+        await cacheManager.evict(cacheName);
         return result;
     });
+}
+
+export function hasRedisConfigured(): boolean {
+    return env.REDIS_URL !== "";
 }

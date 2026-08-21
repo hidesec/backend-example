@@ -1,27 +1,20 @@
 import {
-  ColumnMetadata, ColumnType, EntityMetadata, ForeignKeyMetadata, getAllEntities,
+  ColumnMetadata, EntityMetadata, ForeignKeyMetadata, getAllEntities,
 } from "@decorators/orm/column.decorator";
+import { env } from "@config/env";
+import { Dialect, getDialect } from "@database/core/dialect";
 
-function mapColumnType(col: ColumnMetadata): string {
-  switch (col.type) {
-    case ColumnType.VARCHAR: return `VARCHAR(${col.length ?? 255})`;
-    case ColumnType.CHAR: return `CHAR(${col.length ?? 1})`;
-    case ColumnType.DECIMAL:
-    case ColumnType.NUMERIC: return `${col.type}(${col.precision ?? 12}, ${col.scale ?? 2})`;
-    case ColumnType.ENUM: {
-      const values = (col.enumValues ?? []).map((v) => `'${v}'`).join(", ");
-      return `VARCHAR(50) CHECK (${col.columnName} IN (${values}))`;
-    }
-    default: return col.type;
-  }
+function activeDialect(): Dialect {
+  return getDialect(env.DB_CLIENT);
 }
 
-function buildColumnLine(col: ColumnMetadata): string {
-  let line = `  ${col.columnName} ${mapColumnType(col)}`;
-  if (col.isPrimary) line += " PRIMARY KEY";
+function buildColumnLine(dialect: Dialect, col: ColumnMetadata): string {
+  let line = `  ${col.columnName} ${dialect.mapColumn(col)}`;
+  if (col.isPrimary && !col.type.toString().includes("SERIAL")) line += " PRIMARY KEY";
   if (col.default) line += ` DEFAULT ${col.default}`;
   if (!col.nullable && !col.isPrimary) line += " NOT NULL";
   if (col.unique && !col.isPrimary) line += " UNIQUE";
+  if (col.isUpdatedAt) line += dialect.timestampOnUpdateSuffix();
   return line;
 }
 
@@ -30,19 +23,24 @@ function resolveForeignKeyTable(fk: ForeignKeyMetadata): string {
   return resolver ? resolver() : fk.referencedTable;
 }
 
-export function buildCreateTableSQL(entity: EntityMetadata): string {
-  const qualifiedTable = `${entity.schemaName}.${entity.tableName}`;
-  const columnLines = entity.columns.map(buildColumnLine);
+export function buildCreateTableSQL(entity: EntityMetadata, dialect: Dialect = activeDialect()): string {
+  const qualifiedTable = dialect.qualifyTable(entity.schemaName, entity.tableName);
+  const columnLines = entity.columns.map((c) => buildColumnLine(dialect, c));
   const hasUpdatedAt = entity.columns.some((c) => c.isUpdatedAt);
 
-  let sql = `CREATE EXTENSION IF NOT EXISTS "pgcrypto";\n\n`;
+  let sql = "";
 
-  if (entity.schemaName !== "public") {
-    sql += `CREATE SCHEMA IF NOT EXISTS ${entity.schemaName};\n\n`;
+  for (const stmt of dialect.preDDL()) {
+    sql += `${stmt}\n\n`;
+  }
+
+  const createSchema = dialect.createSchemaStmt(entity.schemaName);
+  if (createSchema && entity.schemaName !== "public") {
+    sql += `${createSchema}\n\n`;
   }
 
   const fkColumnLines = entity.foreignKeys.map((fk) => {
-    let line = `  ${fk.columnName} UUID`;
+    let line = `  ${fk.columnName} ${dialect.fkColumnType()}`;
     if (!fk.nullable) line += " NOT NULL";
     if (fk.unique) line += " UNIQUE";
     return line;
@@ -53,52 +51,38 @@ export function buildCreateTableSQL(entity: EntityMetadata): string {
 
   entity.foreignKeys.forEach((fk) => {
     const refTable = resolveForeignKeyTable(fk);
-    sql += `,\n  CONSTRAINT fk_${entity.tableName}_${fk.columnName} FOREIGN KEY (${fk.columnName}) REFERENCES ${entity.schemaName}.${refTable}(${fk.referencedColumn}) ON DELETE ${fk.onDelete}`;
+    sql += `,\n  CONSTRAINT fk_${entity.tableName}_${fk.columnName} FOREIGN KEY (${fk.columnName}) REFERENCES ${dialect.qualifyTable(entity.schemaName, refTable)}(${fk.referencedColumn}) ON DELETE ${fk.onDelete}`;
   });
 
   sql += `\n);\n`;
 
-  // Auto-index dari unique column & FK (perilaku lama, tetap dipertahankan)
   entity.columns
     .filter((c) => c.unique && !c.isPrimary)
     .forEach((c) => {
-      sql += `\nCREATE INDEX IF NOT EXISTS idx_${entity.tableName}_${c.columnName} ON ${qualifiedTable}(${c.columnName});\n`;
+      sql += `\n${dialect.indexStmt(`idx_${entity.tableName}_${c.columnName}`, qualifiedTable, [c.columnName], false)}`;
     });
 
   entity.foreignKeys.forEach((fk) => {
-    sql += `\nCREATE INDEX IF NOT EXISTS idx_${entity.tableName}_${fk.columnName} ON ${qualifiedTable}(${fk.columnName});\n`;
+    sql += `\n${dialect.indexStmt(`idx_${entity.tableName}_${fk.columnName}`, qualifiedTable, [fk.columnName], false)}`;
   });
 
   entity.indexes.forEach((idx) => {
     const idxName = idx.name ?? `idx_${entity.tableName}_${idx.columns.join("_")}`;
-    const uniqueKw = idx.unique ? "UNIQUE " : "";
-    sql += `\nCREATE ${uniqueKw}INDEX IF NOT EXISTS ${idxName} ON ${qualifiedTable}(${idx.columns.join(", ")});\n`;
+    sql += `\n${dialect.indexStmt(idxName, qualifiedTable, idx.columns, idx.unique ?? false)}`;
   });
 
   if (hasUpdatedAt) {
     const updatedCol = entity.columns.find((c) => c.isUpdatedAt)!;
-    const fnName = `trigger_set_${entity.schemaName}_${entity.tableName}_updated_at`;
-    sql += `
--- Auto-update ${updatedCol.columnName} setiap kali row diupdate
-CREATE OR REPLACE FUNCTION ${fnName}()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.${updatedCol.columnName} = now();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS set_updated_at ON ${qualifiedTable};
-CREATE TRIGGER set_updated_at
-BEFORE UPDATE ON ${qualifiedTable}
-FOR EACH ROW EXECUTE FUNCTION ${fnName}();
-`;
+    const trigger = dialect.updatedAtTrigger(entity.schemaName, entity.tableName, updatedCol.columnName);
+    if (trigger) {
+      sql += `\n${trigger}\n`;
+    }
   }
 
   return sql;
 }
 
-export function buildManyToManyJoinTableSQL(entity: EntityMetadata): string[] {
+export function buildManyToManyJoinTableSQL(entity: EntityMetadata, dialect: Dialect = activeDialect()): string[] {
   const statements: string[] = [];
 
   entity.manyToMany.forEach((rel) => {
@@ -112,14 +96,14 @@ export function buildManyToManyJoinTableSQL(entity: EntityMetadata): string[] {
     const joinTable = rel.joinTable ?? `${entity.tableName}_${targetMeta.tableName}`;
     const joinColumn = rel.joinColumn ?? `${entity.tableName.replace(/s$/, "")}_id`;
     const inverseJoinColumn = rel.inverseJoinColumn ?? `${targetMeta.tableName.replace(/s$/, "")}_id`;
-    const qualifiedJoinTable = `${entity.schemaName}.${joinTable}`;
+    const qualifiedJoinTable = dialect.qualifyTable(entity.schemaName, joinTable);
 
     let sql = `CREATE TABLE IF NOT EXISTS ${qualifiedJoinTable} (\n`;
-    sql += `  ${joinColumn} UUID NOT NULL REFERENCES ${entity.schemaName}.${entity.tableName}(id) ON DELETE CASCADE,\n`;
-    sql += `  ${inverseJoinColumn} UUID NOT NULL REFERENCES ${targetMeta.schemaName}.${targetMeta.tableName}(id) ON DELETE CASCADE,\n`;
+    sql += `  ${joinColumn} ${dialect.fkColumnType()} NOT NULL REFERENCES ${dialect.qualifyTable(entity.schemaName, entity.tableName)}(id) ON DELETE CASCADE,\n`;
+    sql += `  ${inverseJoinColumn} ${dialect.fkColumnType()} NOT NULL REFERENCES ${dialect.qualifyTable(targetMeta.schemaName, targetMeta.tableName)}(id) ON DELETE CASCADE,\n`;
     sql += `  PRIMARY KEY (${joinColumn}, ${inverseJoinColumn})\n`;
     sql += `);\n`;
-    sql += `\nCREATE INDEX IF NOT EXISTS idx_${joinTable}_${inverseJoinColumn} ON ${qualifiedJoinTable}(${inverseJoinColumn});\n`;
+    sql += `\n${dialect.indexStmt(`idx_${joinTable}_${inverseJoinColumn}`, qualifiedJoinTable, [inverseJoinColumn], false)}`;
 
     statements.push(sql);
   });
@@ -127,30 +111,32 @@ export function buildManyToManyJoinTableSQL(entity: EntityMetadata): string[] {
   return statements;
 }
 
-export function buildDropTableSQL(entity: EntityMetadata): string {
-  const qualifiedTable = `${entity.schemaName}.${entity.tableName}`;
+export function buildDropTableSQL(entity: EntityMetadata, dialect: Dialect = activeDialect()): string {
+  const qualifiedTable = dialect.qualifyTable(entity.schemaName, entity.tableName);
   let sql = "";
 
   const hasUpdatedAt = entity.columns.some((c) => c.isUpdatedAt);
-  if (hasUpdatedAt) {
-    const fnName = `trigger_set_${entity.schemaName}_${entity.tableName}_updated_at`;
+  if (hasUpdatedAt && dialect.updatedAtTrigger(entity.schemaName, entity.tableName, "updated_at")) {
     sql += `DROP TRIGGER IF EXISTS set_updated_at ON ${qualifiedTable};\n`;
-    sql += `DROP FUNCTION IF EXISTS ${fnName}();\n\n`;
+    if (dialect.name === "postgres") {
+      sql += `DROP FUNCTION IF EXISTS trigger_set_${entity.schemaName}_${entity.tableName}_updated_at();\n`;
+    }
+    sql += `\n`;
   }
 
-  sql += `DROP TABLE IF EXISTS ${qualifiedTable} CASCADE;\n`;
+  sql += `DROP TABLE IF EXISTS ${qualifiedTable} ${dialect.name === "oracle" ? "" : "CASCADE"};\n`;
   return sql;
 }
 
 /** DOWN migration untuk join table @ManyToMany — harus di-drop SEBELUM tabel utama */
-export function buildDropJoinTableSQL(entity: EntityMetadata): string[] {
+export function buildDropJoinTableSQL(entity: EntityMetadata, dialect: Dialect = activeDialect()): string[] {
   return entity.manyToMany
     .map((rel) => {
       const targetEntityFn = rel.targetEntity();
       const targetMeta = getAllEntities().find((e) => e.target === targetEntityFn);
       if (!targetMeta) return "";
       const joinTable = rel.joinTable ?? `${entity.tableName}_${targetMeta.tableName}`;
-      return `DROP TABLE IF EXISTS ${entity.schemaName}.${joinTable} CASCADE;\n`;
+      return `DROP TABLE IF EXISTS ${dialect.qualifyTable(entity.schemaName, joinTable)} ${dialect.name === "oracle" ? "" : "CASCADE"};\n`;
     })
     .filter(Boolean);
 }

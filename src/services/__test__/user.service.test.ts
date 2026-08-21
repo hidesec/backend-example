@@ -10,12 +10,11 @@ describe("UserService", () => {
     let mockEventBus: jest.Mocked<IEventBus>;
     let userService: UserService;
 
-    const mockClient = {
-        query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
-        release: jest.fn(),
-    };
+    const executedStatements: string[] = [];
 
     beforeEach(() => {
+        executedStatements.length = 0;
+
         mockRepo = {
             findById: jest.fn(),
             findByEmail: jest.fn(),
@@ -33,9 +32,26 @@ describe("UserService", () => {
             publish: jest.fn().mockResolvedValue(undefined),
         };
 
-        container.register("DatabasePool", {
+        container.register("DatabaseDriver", {
             useValue: {
-                connect: jest.fn().mockResolvedValue(mockClient),
+                clientName: "postgres",
+                query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+                transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+                    executedStatements.push("BEGIN");
+                    try {
+                        const result = await fn({
+                            query: jest.fn(async (sql: string) => {
+                                executedStatements.push(sql);
+                                return { rows: [], rowCount: 0 };
+                            }),
+                        });
+                        executedStatements.push("COMMIT");
+                        return result;
+                    } catch (err) {
+                        executedStatements.push("ROLLBACK");
+                        throw err;
+                    }
+                }),
             },
         });
 
@@ -55,8 +71,8 @@ describe("UserService", () => {
             userId: "1",
             email: "john.doe@example.com",
         });
-        expect(mockClient.query).toHaveBeenCalledWith("BEGIN");
-        expect(mockClient.query).toHaveBeenCalledWith("COMMIT");
+        expect(executedStatements).toContain("BEGIN");
+        expect(executedStatements).toContain("COMMIT");
     });
 
     it("should throw NotFound when deleting missing user", async () => {
@@ -64,6 +80,6 @@ describe("UserService", () => {
 
         await expect(userService.deleteUser("missing-id")).rejects.toThrow("User with id missing-id not found");
         expect(mockRepo.deleteById).not.toHaveBeenCalled();
-        expect(mockClient.query).toHaveBeenCalledWith("ROLLBACK");
+        expect(executedStatements).toContain("ROLLBACK");
     });
 });

@@ -7,7 +7,7 @@ import { Scheduled } from "@schedule/scheduler";
 export class CacheMaintenanceTask {
     @Scheduled("*/10 * * * *")
     async sweepExpiredCacheEntries(): Promise<void> {
-        const removed = cacheManager.sweep();
+        const removed = await cacheManager.sweep();
         if (removed > 0) {
             logger.info({ removed }, "Expired cache entries swept");
         }

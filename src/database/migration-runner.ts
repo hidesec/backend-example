@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { Pool } from "pg";
+import { DatabaseDriver } from "./core/types";
 
 interface MigrationPair {
   name: string;
@@ -12,7 +12,7 @@ const MIGRATIONS_TABLE = "schema_migrations";
 
 export class MigrationRunner {
   constructor(
-    private readonly pool: Pool,
+    private readonly driver: DatabaseDriver,
     private readonly migrationsDir: string
   ) {}
 
@@ -57,21 +57,68 @@ export class MigrationRunner {
     console.log(`Rolled back ${toRollback.length} migration(s).`);
   }
 
-  private async ensureMigrationsTable(): Promise<void> {
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (
+  private async migrationsTableDDL(): Promise<string> {
+    switch (this.driver.clientName) {
+      case "postgres":
+        return `CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL UNIQUE,
         executed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );`;
+      case "mysql":
+        return `CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        executed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`;
+      case "mssql":
+        return `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='${MIGRATIONS_TABLE}' AND xtype='U')
+        CREATE TABLE ${MIGRATIONS_TABLE} (
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          name NVARCHAR(255) NOT NULL UNIQUE,
+          executed_at DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+        );`;
+      case "oracle": {
+        const count = await this.countMigrationsTable();
+        if (count > 0) return "";
+        return `CREATE TABLE ${MIGRATIONS_TABLE} (
+        id NUMBER(10) GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        name VARCHAR2(255) NOT NULL UNIQUE,
+        executed_at TIMESTAMP DEFAULT SYSTIMESTAMP
+      )`;
+      }
+      case "sqlite":
+        return `CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        executed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`;
+    }
+  }
+
+  private async countMigrationsTable(): Promise<number> {
+    try {
+      const result = await this.driver.query(
+        `SELECT COUNT(*) AS cnt FROM user_tables WHERE table_name = UPPER('${MIGRATIONS_TABLE}')`
       );
-    `);
+      return Number(result.rows[0]?.cnt ?? 0);
+    } catch {
+      return 0;
+    }
+  }
+
+  private async ensureMigrationsTable(): Promise<void> {
+    const ddl = await this.migrationsTableDDL();
+    if (ddl.trim().length === 0) return;
+    await this.driver.query(ddl);
   }
 
   private getMigrationPairs(): MigrationPair[] {
-    if (!fs.existsSync(this.migrationsDir)) return [];
+    const dir = this.dialectSpecificDir();
+    if (!fs.existsSync(dir)) return [];
 
     const upFiles = fs
-      .readdirSync(this.migrationsDir)
+      .readdirSync(dir)
       .filter((f) => f.endsWith(".up.sql"))
       .sort();
 
@@ -79,14 +126,28 @@ export class MigrationRunner {
       const name = upFile.replace(/\.up\.sql$/, "");
       return {
         name,
-        upPath: path.join(this.migrationsDir, upFile),
-        downPath: path.join(this.migrationsDir, `${name}.down.sql`),
+        upPath: path.join(dir, upFile),
+        downPath: path.join(dir, `${name}.down.sql`),
       };
     });
   }
 
+  /**
+   * Migrasi spesifik dialek bisa diletakkan di migrations/<client>/,
+   * fallback ke migrations/ umum jika folder tersebut tidak ada.
+   */
+  private dialectSpecificDir(): string {
+    const specific = path.join(this.migrationsDir, this.driver.clientName);
+    if (fs.existsSync(specific)) return specific;
+
+    const genericExists = fs.existsSync(this.migrationsDir) &&
+      fs.readdirSync(this.migrationsDir).some((f) => f.endsWith(".up.sql"));
+
+    return genericExists ? this.migrationsDir : specific;
+  }
+
   private async getAppliedMigrations(): Promise<string[]> {
-    const result = await this.pool.query<{ name: string }>(
+    const result = await this.driver.query(
       `SELECT name FROM ${MIGRATIONS_TABLE} ORDER BY id ASC`
     );
     return result.rows.map((r) => r.name);
@@ -94,19 +155,15 @@ export class MigrationRunner {
 
   private async applyUp(migration: MigrationPair): Promise<void> {
     const sql = fs.readFileSync(migration.upPath, "utf-8");
-    const client = await this.pool.connect();
     try {
-      await client.query("BEGIN");
-      await client.query(sql);
-      await client.query(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES ($1)`, [migration.name]);
-      await client.query("COMMIT");
+      await this.driver.transaction(async (tx) => {
+        await tx.query(sql);
+        await tx.query(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES ($1)`, [migration.name]);
+      });
       console.log(`Applied: ${migration.name}`);
     } catch (err) {
-      await client.query("ROLLBACK");
       console.error(`Failed: ${migration.name}`);
       throw err;
-    } finally {
-      client.release();
     }
   }
 
@@ -117,19 +174,15 @@ export class MigrationRunner {
     }
 
     const sql = fs.readFileSync(migration.downPath, "utf-8");
-    const client = await this.pool.connect();
     try {
-      await client.query("BEGIN");
-      await client.query(sql);
-      await client.query(`DELETE FROM ${MIGRATIONS_TABLE} WHERE name = $1`, [migration.name]);
-      await client.query("COMMIT");
+      await this.driver.transaction(async (tx) => {
+        await tx.query(sql);
+        await tx.query(`DELETE FROM ${MIGRATIONS_TABLE} WHERE name = $1`, [migration.name]);
+      });
       console.log(`Reverted: ${migration.name}`);
     } catch (err) {
-      await client.query("ROLLBACK");
       console.error(`Failed to revert: ${migration.name}`);
       throw err;
-    } finally {
-      client.release();
     }
   }
 
