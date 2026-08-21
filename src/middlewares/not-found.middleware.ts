@@ -1,8 +1,8 @@
-import { Request, Response } from "express";
+import { SolumRequest, SolumResponse } from "@http/http-types";
 
-export function notFoundHandler(req: Request, res: Response): void {
+export function notFoundHandler(req: SolumRequest, res: SolumResponse): void {
     res.status(404).json({
         status: "error",
-        message: `Route ${req.method} ${req.originalUrl} not found`,
+        message: `Route ${req.method} ${req.path} not found`,
     });
 }

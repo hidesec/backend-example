@@ -1,4 +1,4 @@
-import { Request } from "express";
+import { SolumRequest } from "@http/http-types";
 import { logger } from "@config/logger";
 import { ControllerAdvice, ExceptionHandler } from "@decorators/exception-handler.decorator";
 import {
@@ -12,31 +12,31 @@ import {
 @ControllerAdvice()
 export class GlobalExceptionAdvice {
     @ExceptionHandler(NotFoundException)
-    handleNotFound(err: NotFoundException, req: Request) {
+    handleNotFound(err: NotFoundException, req: SolumRequest) {
         logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
         return { status: "error", code: "NOT_FOUND", message: err.message };
     }
 
     @ExceptionHandler(BadRequestException)
-    handleBadRequest(err: BadRequestException, req: Request) {
+    handleBadRequest(err: BadRequestException, req: SolumRequest) {
         logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
         return { status: "error", code: "BAD_REQUEST", message: err.message };
     }
 
     @ExceptionHandler(InvalidQueryParameterException)
-    handleInvalidQueryParameter(err: InvalidQueryParameterException, req: Request) {
+    handleInvalidQueryParameter(err: InvalidQueryParameterException, req: SolumRequest) {
         logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
         return { status: "error", code: "INVALID_QUERY_PARAMETER", message: err.message };
     }
 
     @ExceptionHandler(ServiceUnavailableException)
-    handleServiceUnavailable(err: ServiceUnavailableException, req: Request) {
+    handleServiceUnavailable(err: ServiceUnavailableException, req: SolumRequest) {
         logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
         return { status: "error", code: "SERVICE_UNAVAILABLE", message: err.message };
     }
 
     @ExceptionHandler(HttpException)
-    handleHttpException(err: HttpException, req: Request) {
+    handleHttpException(err: HttpException, req: SolumRequest) {
         logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
         return { status: "error", message: err.message };
     }

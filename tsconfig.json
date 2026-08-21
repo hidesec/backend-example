@@ -15,6 +15,7 @@
             "@decorators/*": ["decorators/*"],
             "@dto/*": ["dto/*"],
             "@entities/*": ["entities/*"],
+            "@http/*": ["http/*"],
             "@exceptions/*": ["exceptions/*"],
             "@middlewares/*": ["middlewares/*"],
             "@repositories/*": ["repositories/*"],

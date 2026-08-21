@@ -1,15 +1,9 @@
-
 import { logger } from "@config/logger";
 import { HttpException } from "@exceptions/http-exceptions";
-import { Request, Response, NextFunction } from "express";
+import { SolumRequest, SolumResponse } from "@http/http-types";
 
-export function errorHandler(
-    err: Error,
-    req: Request,
-    res: Response,
-    _next: NextFunction
-): void {
-    if ( err instanceof HttpException) {
+export function errorHandler(err: Error, req: SolumRequest, res: SolumResponse): void {
+    if (err instanceof HttpException) {
         logger.warn({ path: req.path, statusCode: err.statusCode }, err.message);
         res.status(err.statusCode).json({
             status: "error",
@@ -22,5 +16,5 @@ export function errorHandler(
     res.status(500).json({
         status: "error",
         message: "Internal Server Error",
-    })
+    });
 }

@@ -1,4 +1,3 @@
-import { Application, NextFunction, Request, Response, Router } from "express";
 import { container } from "tsyringe";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
@@ -11,6 +10,8 @@ import {
     getExceptionHandlers,
     getRegisteredAdvice,
 } from "@decorators/exception-handler.decorator";
+import { HttpAdapter } from "@http/http-adapter";
+import { SolumNext, SolumRequest, SolumResponse } from "@http/http-types";
 
 interface RouteInfo {
     method: string;
@@ -28,8 +29,8 @@ async function tryHandleWithExceptionHandlers(
     err: Error,
     handlerTarget: Function,
     handlerInstance: any,
-    req: Request,
-    res: Response
+    req: SolumRequest,
+    res: SolumResponse
 ): Promise<boolean> {
     const handlers = getExceptionHandlers(handlerTarget);
     if (handlers.length === 0) return false;
@@ -48,7 +49,12 @@ async function tryHandleWithExceptionHandlers(
     return true;
 }
 
-async function resolveValue(meta: ParamMetadata, req: Request, res: Response, next: NextFunction): Promise<unknown> {
+async function resolveValue(
+    meta: ParamMetadata,
+    req: SolumRequest,
+    res: SolumResponse,
+    next: SolumNext
+): Promise<unknown> {
     switch (meta.source) {
         case ParamSource.BODY:
             return req.body;
@@ -68,9 +74,9 @@ async function resolveValue(meta: ParamMetadata, req: Request, res: Response, ne
 async function resolveHandlerArgs(
     controllerTarget: Function,
     handlerName: string,
-    req: Request,
-    res: Response,
-    next: NextFunction
+    req: SolumRequest,
+    res: SolumResponse,
+    next: SolumNext
 ): Promise<unknown[]> {
     const paramsMeta = getParamsMetadata(controllerTarget, handlerName);
 
@@ -124,7 +130,7 @@ function wrapHandler(
 
     const successStatus = getResponseStatus(controllerTarget, handlerName, 200);
 
-    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    return async (req: SolumRequest, res: SolumResponse, next: SolumNext): Promise<void> => {
         try {
             const args = await resolveHandlerArgs(controllerTarget, handlerName, req, res, next);
             const result = await handler.apply(instance, args);
@@ -157,7 +163,7 @@ function wrapHandler(
     };
 }
 
-export function mountControllers(app: Application): void {
+export function mountControllers(adapter: HttpAdapter): void {
     getRegisteredControllers().forEach(({ target, prefix }) => {
         const routes = getRoutesMetadata(target);
 
@@ -167,14 +173,15 @@ export function mountControllers(app: Application): void {
         }
 
         const instance = container.resolve(target);
-        const router = Router();
 
         routes.forEach(({ method, path, handlerName }) => {
-            router[method](path, wrapHandler(instance, handlerName, target));
+            adapter.registerRoute(prefix, {
+                method,
+                path,
+                handler: wrapHandler(instance, handlerName, target),
+            });
             registeredRoutes.push({ method: method.toUpperCase(), path: joinPaths(prefix, path) });
         });
-
-        app.use(prefix, router);
     });
 }
 

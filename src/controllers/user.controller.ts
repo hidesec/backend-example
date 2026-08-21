@@ -1,4 +1,4 @@
-import { Request } from "express";
+import { SolumRequest } from "@http/http-types";
 import { UserResponseDto } from "@dto/user-response.dto";
 import { CreateUserDto } from "@dto/create-user.dto";
 import { IUserService } from "@services/user.service.interface";
@@ -16,7 +16,7 @@ export class UserController {
 
     @Post("/")
     @ResponseStatus(201)
-    async createUser(@Valid() @Body() dto: CreateUserDto, @Req() req: Request) {
+    async createUser(@Valid() @Body() dto: CreateUserDto, @Req() req: SolumRequest) {
         req.log.info({ body: { email: dto.email } }, "Creating new user");
         const user = await this.userService.createUser(dto);
         req.log.info({ userId: user.id }, "User created successfully");
@@ -28,7 +28,7 @@ export class UserController {
     async findRecentByEmails(
         @Query("emails") emails: string,
         @Query("limit") limit: string,
-        @Req() req: Request
+        @Req() req: SolumRequest
     ) {
         const emailList = (emails ?? "")
             .split(",")
@@ -49,7 +49,7 @@ export class UserController {
 
     @Get("/:id")
     @ResponseStatus(200)
-    async getUserById(@Param("id") id: string, @Req() req: Request) {
+    async getUserById(@Param("id") id: string, @Req() req: SolumRequest) {
         req.log.info({ param: id }, "Get user by id");
 
         const user = await this.userService.getUserById(id);
@@ -59,7 +59,7 @@ export class UserController {
     }
 
     @ExceptionHandler(BadRequestException)
-    handleDuplicateEmail(err: BadRequestException, req: Request) {
+    handleDuplicateEmail(err: BadRequestException, req: SolumRequest) {
         req.log.warn({ path: req.path }, err.message);
         return { status: "error", code: "USER_EMAIL_CONFLICT", message: err.message };
     }

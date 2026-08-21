@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import "./container";
 import express from "express";
+import { ExpressHttpAdapter, toExpressErrorHandler, toExpressNotFoundHandler } from "@http/adapters/express.adapter";
 import { errorHandler } from "@middlewares/error-handler.middleware";
 import { securityMiddlewares } from "@middlewares/security.middleware";
 import pinoHttp from "pino-http";
@@ -11,18 +12,20 @@ import { printStartupBanner } from "@config/startup-banner";
 import { mountControllers, listRegisteredRoutes } from "@config/router-factory";
 import { runPreDestroyHooks } from "@decorators/lifecycle.decorator";
 
-const app = express();
+const rawApp = express();
 
-app.use(...securityMiddlewares);
-app.use(express.json({ limit: "10kb" }));
-app.use(pinoHttp({ logger }));
+rawApp.use(...securityMiddlewares);
+rawApp.use(express.json({ limit: "10kb" }));
+rawApp.use(pinoHttp({ logger }));
 
-mountControllers(app);
+const httpAdapter = new ExpressHttpAdapter(rawApp);
 
-app.use(notFoundHandler);
-app.use(errorHandler);
+mountControllers(httpAdapter);
 
-const server = app.listen(env.PORT, () => {
+rawApp.use(toExpressNotFoundHandler(notFoundHandler));
+rawApp.use(toExpressErrorHandler(errorHandler));
+
+const server = httpAdapter.listen(env.PORT, () => {
   printStartupBanner(env.PORT);
 
   const routes = listRegisteredRoutes();
@@ -30,7 +33,7 @@ const server = app.listen(env.PORT, () => {
   routes.forEach((r) => {
     logger.info(`  ${r.method.padEnd(6)} ${r.path}`);
   });
-});
+}) as import("http").Server;
 
 function shutdown(signal: string) {
   logger.info(`${signal} received. shutting down gracefully...`);
